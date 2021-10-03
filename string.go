@@ -40,8 +40,8 @@ func EnvOrDefault(envName string, defaultValue string) string {
 	return defaultValue
 }
 
-//StrToEnvName 将字符串转换为linux环境变量名称 只收录字符 [A-Za-z\-_\.] 点号会被转转为下划线
-// StrToEnvName cover string to linux style environment variable name,
+// StrToEnvName cover string to linux style environment variable name, only [A-Za-z\-_\.] will be convert to underscore
+// StrToEnvName 将字符串转换为linux环境变量名称 只收录字符 [A-Za-z\-_\.] 点号会被转转为下划线
 func StrToEnvName(s string) (ret string) {
 	var x []rune
 	var prevIsLowerCase bool
