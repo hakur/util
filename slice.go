@@ -7,18 +7,24 @@ import (
 )
 
 // SlicePagerOpts pagination settings
+// SlicePagerOpts 分页设置
 type SlicePagerOpts struct {
 	// CurrentPage current page
+	// CurrentPage 当前页
 	CurrentPage int `json:"currentPage"`
 	// TotalPages total pages
+	// TotalPages 总页数
 	TotalPages int `json:"totalPages"`
 	// TotalNum total elements count of slice
+	// TotalNum 总共有多少条数据在slice
 	TotalNum int `json:"totalNum"`
 	// Limit how many slice elements per page
+	// Limit 每页将有多少条数据
 	Limit int `json:"limit"`
 }
 
 // SlicePager paginate slice by SlicePagerOpts
+// SlicePager 基于slice做分页
 func SlicePager(input interface{}, outut interface{}, p *SlicePagerOpts) (err error) {
 	page := p.CurrentPage
 	limit := p.Limit
@@ -61,6 +67,7 @@ func SlicePager(input interface{}, outut interface{}, p *SlicePagerOpts) (err er
 // DeleteByIndex delete slice element from slice by index
 // Dont use this function on big slice
 // Example see slice_test.go#TestDeleteByIndex()
+// DeleteByIndex 以指定的索引下标删除slice中的某个元素，请勿用于巨大的slice
 func DeleteByIndex(slice interface{}, index int) (err error) {
 	sliceType := reflect.TypeOf(slice)
 
@@ -83,6 +90,7 @@ func DeleteByIndex(slice interface{}, index int) (err error) {
 // if value matched multiple elements, theese elements will be delete from slice
 // Dont use this function on big slice
 // Example see slice_test.go#TestDeleteByValue()
+// DeleteByValue 以指定的值标删除slice中的N个元素，请勿用于巨大的slice
 func DeleteByValue(slice interface{}, value interface{}) (err error) {
 	sliceType := reflect.TypeOf(slice)
 
@@ -116,6 +124,7 @@ func DeleteByValue(slice interface{}, value interface{}) (err error) {
 // value type and slice element type must be same
 // Dont use this function on big slice
 // Example see slice_test.go#TestInSlice()
+// InSlice 检测值是否存在于slice中
 func InSlice(slice interface{}, value interface{}) (exists bool, err error) {
 	sliceType := reflect.TypeOf(slice)
 

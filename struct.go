@@ -9,34 +9,8 @@ import (
 // ParseStructWithEnv pasr struct tag(convert style see StrToEnvName function) and check if OS environment name matched tag
 // if matched tag, set environment variable name as struct field value
 // current support struct field value type are [Int Bool String Struct]
-// usage example
-// type config struct {
-// 	TimeZone string `yaml:"timeZone"`
-// 	LogLevel string `yaml:"logLevel"`
-// 	Web      struct {
-// 		Port     int    `yaml:"port"`
-// 		Address  string `yaml:"address"`
-// 		SiteName string `yaml:"siteName"`
-// 	} `yaml:"web"`
-// 	NatsStreaming struct {
-// 		Url      string `yaml:"url"`
-// 		Token    string `yaml:"token"`
-// 		ClientID string `yaml:"clientId"`
-// 	} `yaml:"nats"`
-// 	DB struct {
-// 		Host        string `yaml:"host"`
-// 		Port        string `yaml:"port"`
-// 		Username    string `yaml:"username"`
-// 		Password    string `yaml:"password"`
-// 		Name        string `yaml:"name"`
-// 		MinConn     int    `yaml:"minConn"`
-// 		MaxConn     int    `yaml:"maxConn"`
-// 		AutoMigrate bool   `yaml:"autoMigrate"`
-// 		TablePrefix string `yaml:"tablePrefix"`
-// 	} `yaml:"db"`
-// }
-// APPConfig = new(config)
-// ParseStructWithEnv(APPConfig, "")
+// ParseStructWithEnv 使用结构体的tag映射环境变量值，tag和环境变量名的转换参照函数StrToEnvName,当前只支持 [Int Bool String Struct]
+// usage example see struct_test.go
 func ParseStructWithEnv(structNode interface{}, rootNodeName string) {
 	tp := reflect.TypeOf(structNode)
 	var val reflect.Value
