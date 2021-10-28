@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -40,4 +41,42 @@ func TestParseStructWithEnv(t *testing.T) {
 	appConfig := new(TestAppConfig)
 	ParseStructWithEnv(appConfig, "")
 	fmt.Println(appConfig.NatsStreaming.Url, appConfig.DB.Port, appConfig.DB.AutoMigrate, appConfig.DB.TablePrefix)
+}
+
+type blackJackInfomation struct {
+	Name       string            `default:"BlackJack"`
+	Age        int               `default:"18"`
+	Money      uint64            `default:"420000"`
+	Salary     float64           `default:"12000.56"`
+	Alive      bool              `default:"true"`
+	Family     [2]string         `default:"father,mother,child"`
+	TVChannel  [2]int            `default:"66,99,55"`
+	FavorColor [3]byte           `default:"100,101,253"`
+	Friends    []string          `default:"bob,alice,mike"`                       // only simple types like string or number
+	PhonesBook map[string]string `default:"bob=010-15235789,alice=0825-54567893"` // only simple types like string or number
+	BlackSmith *neighbor
+	WhiteSmith neighbor
+}
+
+type neighbor struct {
+	XName string `default:"nnn"`
+	XAge  int8   `default:"99"`
+}
+
+func TestDefaultValue(t *testing.T) {
+	data := &blackJackInfomation{BlackSmith: &neighbor{}, Friends: []string{"aa"}} // if set some field manually, will not set default value to them
+	if err := DefaultValue(data); err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Println(data)
+	}
+}
+
+func TestBasicTypeReflectSetValue(t *testing.T) {
+	aa := 11
+	if err := BasicTypeReflectSetValue(reflect.ValueOf(&aa).Elem(), "22"); err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Println(aa)
+	}
 }
