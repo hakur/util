@@ -159,3 +159,17 @@ func ParseVersion(versionStr string) (version *Version, err error) {
 
 	return
 }
+
+func BoolToStrNumber(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
+}
+
+func BoolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
