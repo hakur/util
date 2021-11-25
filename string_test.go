@@ -53,3 +53,10 @@ func TestParseVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestStripHtmlTags(t *testing.T) {
+	fmt.Println(StripHtmlTags("<a href='https://www.google.com'>google link</a>"))
+	fmt.Println(StripHtmlTags("<div><a href='https://www.google.com'>中文字符</a></div>"))
+	fmt.Println(StripHtmlTags("<script type=\"text/javascript\">alert(1);\nalert(3)</script>"))
+	fmt.Println(StripHtmlTags("<style type=\"text/css\">div</style>"))
+}

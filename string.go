@@ -173,3 +173,11 @@ func BoolToInt(value bool) int {
 	}
 	return 0
 }
+
+// StripHtmlTags remove html tags and return text content only
+// StripHtmlTags 去除html标签并返回纯文本内容
+func StripHtmlTags(html string) (s string) {
+	reg := regexp.MustCompile("(<([^>]+)>)")
+	s = reg.ReplaceAllString(html, "")
+	return
+}
