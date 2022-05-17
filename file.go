@@ -47,6 +47,7 @@ func IsEmptyDir(dirPath string) bool {
 	return false
 }
 
+// ReadDirRecusive read files under directory with recursive
 // ReadDirRecusive 递归读取目录下所有的文件和文件夹
 func ReadDirRecusive(path string, callback func(filepath string)) (err error) {
 	files, err := os.ReadDir(path)
