@@ -15,8 +15,9 @@ func TestIsEmptyDir(t *testing.T) {
 }
 
 func TestReadDirRecusive(t *testing.T) {
-	if err := ReadDirRecusive("/opt", func(filepath string) {
-		println(filepath)
+	if err := ReadDirRecusive("/opt", func(filePath string) (err error) {
+		println(filePath)
+		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
