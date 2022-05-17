@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hakur/util/internal"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
@@ -177,7 +178,5 @@ func BoolToInt(value bool) int {
 // StripHtmlTags remove html tags and return text content only
 // StripHtmlTags 去除html标签并返回纯文本内容
 func StripHtmlTags(html string) (s string) {
-	reg := regexp.MustCompile("(<([^>]+)>)")
-	s = reg.ReplaceAllString(html, "")
-	return
+	return internal.StripTags(html)
 }
