@@ -13,3 +13,11 @@ func TestFileExists(t *testing.T) {
 func TestIsEmptyDir(t *testing.T) {
 	println(IsEmptyDir("/aa"))
 }
+
+func TestReadDirRecusive(t *testing.T) {
+	if err := ReadDirRecusive("/opt", func(filepath string) {
+		println(filepath)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
