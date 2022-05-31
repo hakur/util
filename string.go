@@ -180,3 +180,85 @@ func BoolToInt(value bool) int {
 func StripHtmlTags(html string) (s string) {
 	return internal.StripTags(html)
 }
+
+// DockerImageNameInfo docker image information
+// DockerImageNameInfo docker image 信息
+type DockerImageNameInfo struct {
+	// Schema api server http schema, values are http or https
+	// Schema 仓库服务器访问方式，http或https
+	Schema string `json:"schema"`
+	// Domain api server host domain
+	// Domain 仓库服务器域名
+	Domain string `json:"domain"`
+	// Path image base name, such as rumia/rds-operator or pizza/rumia/rds-operator or library/centos
+	// Path 镜像基本名称，比如 rumia/rds-operator or pizza/rumia/rds-operator or library/centos
+	Path string `json:"path"`
+	// Tag image tag, exclusive with Digest column
+	// Tag 镜像tag，和sha256签名互斥
+	Tag string `json:"tag"`
+	// Digest image sha256 digest, exclusive with Tag column
+	// Digest 镜像sha256签名，和tag字段互斥
+	Digest string `json:"digest"`
+}
+
+// GetReference return sha256 digest or tag name , always used for docker registry v2 client
+// GetReference 返回sha256签名或tag名称 , 通常用于 docker registry v2 客户端
+func (t *DockerImageNameInfo) GetReference() (tagOrDigest string) {
+	if t.Tag != "" {
+		tagOrDigest = t.Tag
+	} else if t.Digest != "" {
+		tagOrDigest = t.Digest
+	}
+	return
+}
+
+// String format output
+// String 格式化输出
+func (t *DockerImageNameInfo) String() (fullname string) {
+	if t.Digest != "" {
+		fullname = t.Schema + "://" + t.Domain + "/" + t.Path + "@" + t.Digest
+	} else {
+		fullname = t.Schema + "://" + t.Domain + "/" + t.Path + ":" + t.Tag
+	}
+	return
+}
+
+// ParseDockerImageNameInfo parse docker image info by image name
+// ParseDockerImageNameInfo 通过镜像名称解析docker镜像信息
+func ParseDockerImageNameInfo(imageName string) (info *DockerImageNameInfo) {
+	info = new(DockerImageNameInfo)
+	info.Schema = "https"
+
+	if strings.Contains(imageName, "http://") {
+		info.Schema = "http"
+	}
+	imageName = strings.TrimPrefix(imageName, info.Schema+"://")
+
+	arr := strings.Split(imageName, "/")
+	if len(arr) > 2 {
+		info.Domain = arr[0]
+	} else {
+		info.Domain = "docker.io"
+		arr = append([]string{info.Domain}, arr...)
+	}
+
+	pathInfoArr := strings.Split(strings.Join(arr[1:], "/"), ":")
+	if len(pathInfoArr) < 2 {
+		pathInfoArr = append(pathInfoArr, "latest")
+	}
+
+	imagePathArr := strings.Split(pathInfoArr[0], "/")
+	if len(imagePathArr) < 3 {
+		imagePathArr = append([]string{"library"}, imagePathArr...)
+	}
+
+	info.Path = strings.Join(imagePathArr, "/")
+	if strings.Contains(info.Path, "@sha256") {
+		info.Path = strings.TrimSuffix(info.Path, "@")
+		info.Digest = "@sha256:" + pathInfoArr[1]
+	} else {
+		info.Tag = pathInfoArr[1]
+	}
+
+	return
+}

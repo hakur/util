@@ -80,3 +80,20 @@ func TestBasicTypeReflectSetValue(t *testing.T) {
 		fmt.Println(aa)
 	}
 }
+
+func TestParseDockerImageNameInfo(t *testing.T) {
+	var imageNames = []string{
+		"https://docker.io/pizza/rumia/rds-operator:v0.0.3",
+		"https://docker.io/rumia/rds-operator:v0.0.3",
+		"https://docker.io/rumia/rds-operator@sha256:123456789",
+		"https://docker.io/rumia/rds-operator",
+		"http://quay.io/rumia/rds-operator",
+		"rumia/rds-operator",
+		"centos",
+	}
+
+	for _, imageName := range imageNames {
+		info := ParseDockerImageNameInfo(imageName)
+		LogJSON(info)
+	}
+}
