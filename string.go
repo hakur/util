@@ -248,7 +248,7 @@ func ParseDockerImageNameInfo(imageName string) (info *DockerImageNameInfo) {
 	}
 
 	imagePathArr := strings.Split(pathInfoArr[0], "/")
-	if len(imagePathArr) < 3 {
+	if len(imagePathArr) < 2 {
 		imagePathArr = append([]string{"library"}, imagePathArr...)
 	}
 
