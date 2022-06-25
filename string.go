@@ -262,3 +262,13 @@ func ParseDockerImageNameInfo(imageName string) (info *DockerImageNameInfo) {
 
 	return
 }
+
+// EscapeWindowsFilename escape special character for windows name
+// EscapeWindowsFilename 转义windows文件名特殊字符
+func EscapeWindowsFilename(filename string) string {
+	for _, v := range []string{`\`, `/`, `:`, `?`, `"`, `<`, `>`, `|`} {
+		filename = strings.ReplaceAll(filename, v, "___")
+	}
+
+	return filename
+}
