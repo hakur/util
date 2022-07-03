@@ -60,3 +60,7 @@ func TestStripHtmlTags(t *testing.T) {
 	fmt.Println(StripHtmlTags("<script type=\"text/javascript\">alert(1);\nalert(3)</script>"))
 	fmt.Println(StripHtmlTags("<style type=\"text/css\">div</style>"))
 }
+
+func TestEscapeWindowsFilename(t *testing.T) {
+	fmt.Println(EscapeWindowsFilename("rtsp://localhost:8554/mystream"))
+}
