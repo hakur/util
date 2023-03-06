@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/big"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -271,4 +273,35 @@ func EscapeWindowsFilename(filename string) string {
 	}
 
 	return filename
+}
+
+// Long2IP ip整数转换为字符串
+// Long2IP ip number to string
+// from https://blog.csdn.net/janbar/article/details/127709072
+func Long2IP(ip *big.Int, ipv4 int64) string {
+	if ip == nil {
+		ip = new(big.Int).SetInt64(ipv4)
+	}
+
+	addr, ok := netip.AddrFromSlice(ip.Bytes())
+	if ok {
+		return addr.String()
+	}
+	return ""
+}
+
+// IP2Long ip字符串转换为整数
+// IP2Long ip string to number
+// from https://blog.csdn.net/janbar/article/details/127709072
+func IP2Long(ip string) (*big.Int, int64, error) {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return nil, 0, err
+	}
+	// ipv4和ipv6分两种情况,使调用方知道返回类型
+	ipInt := new(big.Int).SetBytes(addr.AsSlice())
+	if addr.Is4() {
+		return nil, ipInt.Int64(), nil
+	}
+	return ipInt, 0, nil
 }
