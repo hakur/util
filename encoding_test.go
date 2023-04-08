@@ -10,3 +10,7 @@ func TestBase64Decode(t *testing.T) {
 func TestMd5(t *testing.T) {
 	println(Md5("123456"))
 }
+
+func TestIsBigEndian(*testing.T) {
+	println(IsBigEndian(100))
+}

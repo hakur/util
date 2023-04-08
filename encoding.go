@@ -3,6 +3,7 @@ package util
 import (
 	"crypto/md5"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"regexp"
 	"strings"
@@ -35,4 +36,13 @@ func Md5(s string) string {
 	h := md5.New()
 	h.Write([]byte(s))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// EncodeUint32 函数编码一个 uint32 类型的整数为按照主机内存字节序编码的字节切片
+func IsBigEndian[T uint16 | uint32 | uint64 | int | int16 | int32 | int64](n T) bool {
+	// 检测主机内存字节序
+	if binary.LittleEndian.Uint16([]byte{0x01, 0x02}) != 0x0201 {
+		return true
+	}
+	return false
 }
