@@ -38,9 +38,8 @@ func Md5(s string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// EncodeUint32 函数编码一个 uint32 类型的整数为按照主机内存字节序编码的字节切片
+// IsBigEndian 检测主机内存字节序，一般来说power PC 这些IBM的CPU是大端序内存布局，而intel的CPU则是小端序布局。只有超过2个字节的数据类型才会有端序的概念，因此这里不检查uint8
 func IsBigEndian[T uint16 | uint32 | uint64 | int | int16 | int32 | int64](n T) bool {
-	// 检测主机内存字节序
 	if binary.LittleEndian.Uint16([]byte{0x01, 0x02}) != 0x0201 {
 		return true
 	}
