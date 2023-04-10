@@ -12,5 +12,5 @@ func TestMd5(t *testing.T) {
 }
 
 func TestIsBigEndian(*testing.T) {
-	println(IsBigEndian(100))
+	println(IsBigEndianCPU())
 }
