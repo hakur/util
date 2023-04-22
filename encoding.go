@@ -40,8 +40,5 @@ func Md5(s string) string {
 
 // IsBigEndianCPU 检测主机内存字节序，一般来说power PC 这些IBM的CPU是大端序内存布局，而intel的CPU则是小端序布局。只有超过2个字节的数据类型才会有端序的概念，因此这里不检查uint8
 func IsBigEndianCPU() bool {
-	if binary.LittleEndian.Uint16([]byte{0x01, 0x02}) != 0x0201 {
-		return true
-	}
-	return false
+	return binary.LittleEndian.Uint16([]byte{0x01, 0x02}) != 0x0201
 }

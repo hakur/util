@@ -3,7 +3,8 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
+
 	"math/big"
 	"net/netip"
 	"os"
@@ -20,7 +21,7 @@ import (
 // Utf8ToGbk 将UTF8内容转换为GBK
 func Utf8ToGbk(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewEncoder())
-	d, e := ioutil.ReadAll(reader)
+	d, e := io.ReadAll(reader)
 	if e != nil {
 		return nil, e
 	}
@@ -31,7 +32,7 @@ func Utf8ToGbk(s []byte) ([]byte, error) {
 // GbkToUtf8 将GBK内容转换成UTF8
 func GbkToUtf8(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
+	d, e := io.ReadAll(reader)
 	if e != nil {
 		return nil, e
 	}
