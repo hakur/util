@@ -26,7 +26,7 @@ func TestLinktedListAppend(t *testing.T) {
 
 func TestObjectRingBufferWrite(t *testing.T) {
 	buffer := NewObjectRingBuffer[int](4)
-	for i := 0; i < 10000000000; i++ {
+	for i := 0; i < 10; i++ {
 		buffer.Write(i)
 	}
 	fmt.Println(buffer.TakeoutAll())

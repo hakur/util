@@ -195,16 +195,10 @@ func (t *ObjectRingBuffer[T]) TakeoutOne() (object T) {
 
 // TakeoutAll 从环形缓冲中取出所有的元素，并清空缓冲区
 func (t *ObjectRingBuffer[T]) TakeoutAll() (objects []T) {
-	fmt.Println("linked list size", t.list.GetSize())
 	size := t.list.GetSize()
 	for i := 0; i < size; i++ {
 		objects = append(objects, t.TakeoutOne())
 	}
-	// t.list.Walk(func(node *LinkedListNode[T]) (err error) {
-	// 	fmt.Println("node value", node.Data)
-	// 	t.list.Remove(node)
-	// 	return nil
-	// })
 
 	return
 }
