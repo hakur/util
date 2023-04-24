@@ -11,7 +11,6 @@ func TestObjectRingBufferWrite(t *testing.T) {
 		buffer.Write(i)
 	}
 	fmt.Println(buffer.TakeoutAll())
-	fmt.Println(buffer.TakeoutAll())
 }
 
 func BenchmarkObjectRingBufferWrite(b *testing.B) {

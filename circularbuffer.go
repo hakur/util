@@ -41,7 +41,7 @@ func (t *ObjectRingBuffer[T]) Write(object T) {
 
 	if t.writeOffset == t.readOffset {
 		t.readOffset++
-		if t.readOffset >= t.currentSize {
+		if t.readOffset >= t.Size {
 			t.readOffset = 0
 		}
 	}
@@ -59,7 +59,7 @@ func (t *ObjectRingBuffer[T]) dequeue(index int) {
 
 // TakeoutOne 从缓冲当前取出第一个元素，当队列中没有任何元素且调用本方法时将会得到一个 nil或零值 返回值
 func (t *ObjectRingBuffer[T]) TakeoutOne() (object T) {
-	if t.Size < 1 {
+	if t.currentSize < 1 {
 		return object
 	}
 
@@ -67,9 +67,9 @@ func (t *ObjectRingBuffer[T]) TakeoutOne() (object T) {
 	t.dequeue(t.readOffset)
 	t.readOffset++
 
-	// if t.readOffset >= t.currentSize { // 有逻辑BUG
-	// 	t.readOffset = 0
-	// }
+	if t.readOffset >= t.Size {
+		t.readOffset = 0
+	}
 
 	t.currentSize--
 
