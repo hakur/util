@@ -67,9 +67,9 @@ func (t *ObjectRingBuffer[T]) TakeoutOne() (object T) {
 	t.dequeue(t.readOffset)
 	t.readOffset++
 
-	if t.readOffset >= t.currentSize {
-		t.readOffset = 0
-	}
+	// if t.readOffset >= t.currentSize { // 有逻辑BUG
+	// 	t.readOffset = 0
+	// }
 
 	t.currentSize--
 

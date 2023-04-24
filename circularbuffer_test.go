@@ -7,9 +7,10 @@ import (
 
 func TestObjectRingBufferWrite(t *testing.T) {
 	buffer := NewObjectRingBuffer[int](4, nil)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		buffer.Write(i)
 	}
+	fmt.Println(buffer.TakeoutAll())
 	fmt.Println(buffer.TakeoutAll())
 }
 
