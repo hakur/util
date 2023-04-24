@@ -49,6 +49,8 @@ func (t *ObjectRingBuffer[T]) Write(object T) {
 	t.writeOffset++
 }
 
+// dequeue 元素离开队列
+// TODO: 让元素真正的离开队列
 func (t *ObjectRingBuffer[T]) dequeue(index int) {
 	if t.dequeueCallback != nil {
 		t.dequeueCallback(t.buffer[index])
