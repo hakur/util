@@ -23,6 +23,8 @@ type ObjectRingBuffer[T any] struct {
 	currentSize int
 	// dequeueCallback 对象离队的回调函数，有可能对象是一个需要执行 Close() 函数的变量呢
 	dequeueCallback func(object T)
+	// zeroValue 零值，用于将队列中对象挤出出列
+	zeroValue T
 }
 
 func (t *ObjectRingBuffer[T]) GetCurrentSize() int {
@@ -60,6 +62,8 @@ func (t *ObjectRingBuffer[T]) dequeue(index int) {
 	if t.dequeueCallback != nil {
 		t.dequeueCallback(t.buffer[index])
 	}
+	// 将对象挤出队列
+	t.buffer[index] = t.zeroValue
 }
 
 // TakeoutOne take out head object of queue, if queue has no object, will return nil or zero value

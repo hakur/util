@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"testing"
 )
 
@@ -24,6 +25,14 @@ func TestObjectRingBufferWriteHalf(t *testing.T) {
 func TestObjectRingBufferWriteFull(t *testing.T) {
 	buffer := NewObjectRingBuffer[int](4, nil)
 	for i := 0; i < 100; i++ {
+		buffer.Write(i)
+	}
+	fmt.Println(buffer.TakeoutAll())
+}
+
+func TestObjectRingBufferWriteIntMax(t *testing.T) {
+	buffer := NewObjectRingBuffer[int](4, nil)
+	for i := 0; i < math.MaxInt; i++ {
 		buffer.Write(i)
 	}
 	fmt.Println(buffer.TakeoutAll())
