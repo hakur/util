@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type TestAppConfig struct {
@@ -40,7 +42,11 @@ func TestParseStructWithEnv(t *testing.T) {
 	os.Setenv(StrToEnvName("db.tablePrefix"), "myTablePrefix")
 	appConfig := new(TestAppConfig)
 	ParseStructWithEnv(appConfig, "")
-	fmt.Println(appConfig.NatsStreaming.Url, appConfig.DB.Port, appConfig.DB.AutoMigrate, appConfig.DB.TablePrefix)
+
+	assert.Equal(t, "127.0.0.1", appConfig.NatsStreaming.Url)
+	assert.Equal(t, 3306, appConfig.DB.Port)
+	assert.Equal(t, true, appConfig.DB.AutoMigrate)
+	assert.Equal(t, "myTablePrefix", appConfig.DB.TablePrefix)
 }
 
 type blackJackInfomation struct {
@@ -65,11 +71,11 @@ type neighbor struct {
 
 func TestDefaultValue(t *testing.T) {
 	data := &blackJackInfomation{BlackSmith: &neighbor{}, Friends: []string{"aa"}} // if set some field manually, will not set default value to them
-	if err := DefaultValue(data); err != nil {
-		t.Fatal(err)
-	} else {
-		fmt.Println(data)
-	}
+	assert.Equal(t, nil, DefaultValue(data))
+	assert.Equal(t, []string{"aa"}, data.Friends)
+	assert.Equal(t, [2]int{66, 99}, data.TVChannel)
+	assert.Equal(t, map[string]string{"bob": "010-15235789", "alice": "0825-54567893"}, data.PhonesBook)
+	assert.Equal(t, int8(99), data.BlackSmith.XAge)
 }
 
 func TestBasicTypeReflectSetValue(t *testing.T) {

@@ -3,12 +3,14 @@ package util
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDate(t *testing.T) {
-	println(Date(time.Now(), "Y-m-d H:i:s"))
+	assert.Equal(t, "2023-06-06 14:25:34", Date(time.Unix(1686032734, 0), "Y-m-d H:i:s"))
 }
 
 func TestPHPDate(t *testing.T) {
-	println(PHPDate(time.Now().Unix(), "Y-m-d H:i:s"))
+	assert.Equal(t, "2023-06-06 14:25:34", PHPDate(1686032734, "Y-m-d H:i:s"))
 }
