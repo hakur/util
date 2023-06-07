@@ -50,9 +50,9 @@ func ParseStructWithEnv(structNode interface{}, rootNodeName string) {
 }
 
 // DefaultValue simply set default value to struct field by "default" tag
-// current support struct field types [ float32 float64 uint int uint8 int8 uint16 int16 uint32 int32 uint64 int64 bool string slice array map ],current not support pointer types, usage example see struct_test.go#TestDefaultValue()
+// current support struct field types [ float32 float64 uint int uint8 int8 uint16 int16 uint32 int32 uint64 int64 bool string slice array map ],current not support pointer types, not support unexported field(lower case named field), usage example see struct_test.go#TestDefaultValue()
 // DefaultValue 简单的设置默认值给结构体字段，通过default标签
-// 当前支持的结构体字段类型 [ float32 float64 uint int uint8 int8 uint16 int16 uint32 int32 uint64 int64 bool string slice array map ],当前不支持指针类型变量
+// 当前支持的结构体字段类型 [ float32 float64 uint int uint8 int8 uint16 int16 uint32 int32 uint64 int64 bool string slice array map ],当前不支持指针类型变量,不支持未导出的结构体字段（名字小写的字段）
 // 使用示范见struct_test.go#TestDefaultValue()
 func DefaultValue(data interface{}) (err error) {
 	dataType := reflect.TypeOf(data)
@@ -82,7 +82,9 @@ func DefaultValue(data interface{}) (err error) {
 			err = BasicTypeReflectSetValue(fieldValue, defaultValue)
 
 		case reflect.Struct:
-			err = DefaultValue(structValue.Field(i).Addr().Interface())
+			if structValue.Field(i).CanSet() {
+				err = DefaultValue(structValue.Field(i).Addr().Interface())
+			}
 
 		case reflect.Slice:
 			sliceData := strings.Split(defaultValue, ",")

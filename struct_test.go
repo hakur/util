@@ -50,23 +50,27 @@ func TestParseStructWithEnv(t *testing.T) {
 }
 
 type blackJackInfomation struct {
-	Name       string            `default:"BlackJack"`
-	Age        int               `default:"18"`
-	Money      uint64            `default:"420000"`
-	Salary     float64           `default:"12000.56"`
-	Alive      bool              `default:"true"`
-	Family     [2]string         `default:"father,mother,child"`
-	TVChannel  [2]int            `default:"66,99,55"`
-	FavorColor [3]byte           `default:"100,101,253"`
-	Friends    []string          `default:"bob,alice,mike"`                       // only simple types like string or number
-	PhonesBook map[string]string `default:"bob=010-15235789,alice=0825-54567893"` // only simple types like string or number
-	BlackSmith *neighbor
-	WhiteSmith neighbor
+	Name        string            `default:"BlackJack"`
+	Age         int               `default:"18"`
+	Money       uint64            `default:"420000"`
+	Salary      float64           `default:"12000.56"`
+	Alive       bool              `default:"true"`
+	Family      [2]string         `default:"father,mother,child"`
+	TVChannel   [2]int            `default:"66,99,55"`
+	FavorColor  [3]byte           `default:"100,101,253"`
+	Friends     []string          `default:"bob,alice,mike"`                       // only simple types like string or number
+	PhonesBook  map[string]string `default:"bob=010-15235789,alice=0825-54567893"` // only simple types like string or number
+	BlackSmith  *neighbor
+	WhiteSmith  neighbor
+	unexported1 neighbor
+	unexported2 *neighbor
+	unexported  int
 }
 
 type neighbor struct {
-	XName string `default:"nnn"`
-	XAge  int8   `default:"99"`
+	XName      string `default:"nnn"`
+	XAge       int8   `default:"99"`
+	unexported int
 }
 
 func TestDefaultValue(t *testing.T) {
@@ -76,6 +80,7 @@ func TestDefaultValue(t *testing.T) {
 	assert.Equal(t, [2]int{66, 99}, data.TVChannel)
 	assert.Equal(t, map[string]string{"bob": "010-15235789", "alice": "0825-54567893"}, data.PhonesBook)
 	assert.Equal(t, int8(99), data.BlackSmith.XAge)
+	assert.Equal(t, int8(99), data.WhiteSmith.XAge)
 }
 
 func TestBasicTypeReflectSetValue(t *testing.T) {
