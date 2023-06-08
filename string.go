@@ -2,8 +2,13 @@ package util
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"time"
 
 	"math/big"
 	"net/netip"
@@ -305,4 +310,95 @@ func IP2Long(ip string) (*big.Int, int64, error) {
 		return nil, ipInt.Int64(), nil
 	}
 	return ipInt, 0, nil
+}
+
+// Base64Decode base64解码 http://php.net/manual/en/function.base64-decode.php
+func Base64Decode(base64Str string) (content string) {
+	p := "^(?:[A-Za-z0-9+\\/]{4})*(?:[A-Za-z0-9+\\/]{2}==|[A-Za-z0-9+\\/]{3}=|[A-Za-z0-9+\\/]{4})$"
+	r := regexp.MustCompile(p)
+
+	if !r.MatchString(base64Str) {
+		return base64Str
+	}
+
+	sr := strings.NewReader(base64Str)
+	reader := base64.NewDecoder(base64.StdEncoding, sr)
+	var buf = make([]byte, 256)
+	for {
+		n, err := reader.Read(buf)
+		if err != nil {
+			return content
+		}
+		content += string(buf[0:n])
+	}
+}
+
+// Md5 generate 32 length md5 string
+// Md5 生成32位md5字串
+func Md5(s string) string {
+	h := md5.New()
+	h.Write([]byte(s))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// IsBigEndianCPU 检测主机内存字节序，一般来说power PC 这些IBM的CPU是大端序内存布局，而intel的CPU则是小端序布局。只有超过2个字节的数据类型才会有端序的概念，因此这里不检查uint8
+func IsBigEndianCPU() bool {
+	return binary.LittleEndian.Uint16([]byte{0x01, 0x02}) != 0x0201
+}
+
+// code from beego framework
+// 代码摘自beego框架
+var datePatterns = []string{
+	// year
+	"Y", "2006", // A full numeric representation of a year, 4 digits   Examples: 1999 or 2003
+	"y", "06", //A two digit representation of a year   Examples: 99 or 03
+
+	// month
+	"m", "01", // Numeric representation of a month, with leading zeros 01 through 12
+	"n", "1", // Numeric representation of a month, without leading zeros   1 through 12
+	"M", "Jan", // A short textual representation of a month, three letters Jan through Dec
+	"F", "January", // A full textual representation of a month, such as January or March   January through December
+
+	// day
+	"d", "02", // Day of the month, 2 digits with leading zeros 01 to 31
+	"j", "2", // Day of the month without leading zeros 1 to 31
+
+	// week
+	"D", "Mon", // A textual representation of a day, three letters Mon through Sun
+	"l", "Monday", // A full textual representation of the day of the week  Sunday through Saturday
+
+	// time
+	"g", "3", // 12-hour format of an hour without leading zeros    1 through 12
+	"G", "15", // 24-hour format of an hour without leading zeros   0 through 23
+	"h", "03", // 12-hour format of an hour with leading zeros  01 through 12
+	"H", "15", // 24-hour format of an hour with leading zeros  00 through 23
+
+	"a", "pm", // Lowercase Ante meridiem and Post meridiem am or pm
+	"A", "PM", // Uppercase Ante meridiem and Post meridiem AM or PM
+
+	"i", "04", // Minutes with leading zeros    00 to 59
+	"s", "05", // Seconds, with leading zeros   00 through 59
+
+	// time zone
+	"T", "MST",
+	"P", "-07:00",
+	"O", "-0700",
+
+	// RFC 2822
+	"r", time.RFC1123Z,
+}
+
+// Date php style date format
+// Date PHP风格的日格式化
+func Date(t time.Time, format string) string {
+	replacer := strings.NewReplacer(datePatterns...)
+	format = replacer.Replace(format)
+	return t.Format(format)
+}
+
+// PHPDate php style date format
+// PHPDate PHP风格的日期格式化
+func PHPDate(stamp int64, format string) string {
+	t := time.Unix(stamp, 0)
+	return Date(t, format)
 }

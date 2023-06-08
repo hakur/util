@@ -1,4 +1,4 @@
-package util
+package alg
 
 // NewObjectRingBuffer create new object ring buffer queue
 // NewObjectRingBuffer 新建对象环形缓冲队列
