@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"runtime"
 	"time"
 
 	"math/big"
@@ -401,4 +402,12 @@ func Date(t time.Time, format string) string {
 func PHPDate(stamp int64, format string) string {
 	t := time.Unix(stamp, 0)
 	return Date(t, format)
+}
+
+// ErrorCaller insert caller to error info, inlucde package name and function name
+// ErrorCaller 将调用处的包名和函数追加到error信息中
+func ErrorCaller(err error) error {
+	pc, _, line, _ := runtime.Caller(1)
+	funcName := runtime.FuncForPC(pc).Name()
+	return fmt.Errorf("[fn=%s,line=%d] %w", funcName, line, err)
 }

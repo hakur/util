@@ -1,6 +1,7 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -87,4 +88,11 @@ func TestDate(t *testing.T) {
 
 func TestPHPDate(t *testing.T) {
 	assert.Equal(t, "2023-06-06 14:25:34", PHPDate(1686032734, "Y-m-d H:i:s"))
+}
+
+func TestErrorCaller(t *testing.T) {
+	var err = errors.New("aaaa")
+	err2 := ErrorCaller(err)
+	assert.Equal(t, true, errors.Is(err2, err))
+	assert.Equal(t, "[fn=github.com/hakur/util.TestErrorCaller,line=95] aaaa", err2.Error())
 }
