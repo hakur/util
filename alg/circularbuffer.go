@@ -9,8 +9,8 @@ func NewObjectRingBuffer[T any](size int, dequeueCallback func(object T)) (t *Ob
 	return t
 }
 
-// ObjectRingBuffer object ring buffer queue base on never grow slice underlay array
-// ObjectRingBuffer 基于永不扩容的slice底层数组的对象环形缓冲队列
+// ObjectRingBuffer object ring buffer queue base on never grow slice underlay array, none thread safe
+// ObjectRingBuffer 基于永不扩容的slice底层数组的对象环形缓冲队列,非线程安全
 type ObjectRingBuffer[T any] struct {
 	Size int
 	// readOffset 读指针，永远指向队列中的第一个对象，在读取后自动挪位置到下一个，在writeOffset和自身相同时自动挪到下一个。当 readOffset == Size-1 时将会回归到数组的下标0
