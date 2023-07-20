@@ -36,3 +36,18 @@ func TestLFUCache(t *testing.T) {
 
 	assert.Equal(t, []int{99, 98, 97, 96}, cache.GetTopHotKeys(4))
 }
+
+func BenchmarkLFUCachePut(b *testing.B) {
+	cache := NewLFUCache[int, int](4)
+	for i := 0; i < b.N; i++ {
+		cache.Put(i, i)
+	}
+}
+
+func BenchmarkLFUCacheGet(b *testing.B) {
+	cache := NewLFUCache[int, int](4)
+	cache.Put(100, 100)
+	for i := 0; i < b.N; i++ {
+		cache.Get(100)
+	}
+}
