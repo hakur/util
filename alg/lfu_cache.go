@@ -2,7 +2,7 @@ package alg
 
 import (
 	"fmt"
-	"sync"
+	"time"
 )
 
 var (
@@ -18,13 +18,18 @@ func NewLFUCache[KT string | int, VT any](size int) (t *LFUCache[KT, VT]) {
 }
 
 type LFUCacheNode[VT any] struct {
-	Value     VT
-	Count     uint64
+	// Value 缓存存储的实际内容
+	Value VT
+	// Count 访问次数统计，溢出后将成为新的值
+	Count uint64
+	// SlotIndex 存在于 LFUCache.data 的那个数组下标
 	SlotIndex int
+	// AccessTime 访问时间，使用简单的int64而不是复杂的time.Time
+	AccessTime int64
 }
 
-// LFUCache thread safe latest frequency use cache
-// LFUCache 线程安全的LFU缓存
+// LFUCache thread safe latest frequency use cache, when add lock to NewLFUCache instance, must use sync.Mutex
+// LFUCache 非线程安全的LFU缓存,对 NewLFUCache 产生的实例加锁时，务必使用互斥锁。
 type LFUCache[KT string | int, VT any] struct {
 	// frequency 链表，当插入新的值时，访问尾端节点的值，即得到应该应该操作那个key
 	frequency []KT
@@ -34,7 +39,7 @@ type LFUCache[KT string | int, VT any] struct {
 	size int
 	// currentSize 当前存储的容量
 	currentSize int
-	lock        sync.RWMutex
+	// lock        sync.RWMutex // 并不是每个人都想要锁住的，看个人的编码情况自行决定是否加锁
 }
 
 func (t *LFUCache[KT, VT]) GetSize() int {
@@ -42,8 +47,8 @@ func (t *LFUCache[KT, VT]) GetSize() int {
 }
 
 func (t *LFUCache[KT, VT]) Put(key KT, value VT) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	// t.lock.Lock()
+	// defer t.lock.Unlock()
 
 	if _, found := t.data[key]; found {
 		t.frequencyInc(key)
@@ -57,6 +62,7 @@ func (t *LFUCache[KT, VT]) Put(key KT, value VT) {
 		t.currentSize++
 	}
 
+	// 填充逻辑，此时data存储槽还没有满
 	if slotIndex >= t.size {
 		slotIndex = t.size - 1
 	}
@@ -64,16 +70,17 @@ func (t *LFUCache[KT, VT]) Put(key KT, value VT) {
 	t.frequency[slotIndex] = key
 
 	t.data[key] = &LFUCacheNode[VT]{
-		Value:     value,
-		Count:     1,
-		SlotIndex: slotIndex,
+		Value:      value,
+		Count:      1,
+		SlotIndex:  slotIndex,
+		AccessTime: time.Now().Unix(),
 	}
 }
 
 // Get 通过key取得value，返回值可能为零值或空值
 func (t *LFUCache[KT, VT]) Get(key KT) (value VT, err error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	// t.lock.Lock()
+	// defer t.lock.Unlock()
 	if node, found := t.data[key]; found {
 		t.frequencyInc(key)
 		value = node.Value
@@ -88,12 +95,14 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 	node := t.data[key]
 	if node != nil {
 		node.Count++
+		node.AccessTime = time.Now().Unix()
 		for range t.frequency { // 无限向前排序
 			prevSlotIndex := node.SlotIndex - 1
 			nodeSlotIndex := node.SlotIndex
 			if prevSlotIndex > -1 {
 				prevNode := t.data[t.frequency[prevSlotIndex]]
-				if prevNode != nil && prevNode.Count < node.Count {
+				// 时间小于当前node，则当前node可以被认为是更活跃的，将当前node移动到data数组的左侧一位
+				if prevNode != nil && ((prevNode.Count < node.Count) || ((prevNode.AccessTime) < (node.AccessTime))) {
 					prevNodeKey := t.frequency[prevSlotIndex]
 					t.frequency[prevSlotIndex] = key
 					t.frequency[nodeSlotIndex] = prevNodeKey
@@ -111,8 +120,8 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 
 // GetTopHotKeys 取得最热的几个key，热度按数组下标从左（小）到右（大）排列,如果要取得全部key的排列信息，则 topNum = GetSize() 即可
 func (t *LFUCache[KT, VT]) GetTopHotKeys(topNum int) (keys []KT) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	// t.lock.RLock()
+	// defer t.lock.RUnlock()
 	for i, key := range t.frequency {
 		if i < topNum {
 			keys = append(keys, key)

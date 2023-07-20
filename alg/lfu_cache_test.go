@@ -7,7 +7,7 @@ import (
 )
 
 func TestLFUCache(t *testing.T) {
-	cache := NewLFUCache[int, int](10)
+	cache := NewLFUCache[int, int](4)
 	for i := 0; i < 100; i++ {
 		cache.Put(i, i)
 	}
