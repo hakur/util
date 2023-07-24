@@ -98,13 +98,20 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 		node.Count++
 		node.AccessTime = time.Now().UnixNano()
 
-		if t.size > 2048 {
+		if t.currentSize > 2048 {
 			// 数据量更大的时候，sort.Search内置的算法会更快一些
 			nodeSlotIndex := node.SlotIndex
 			if nodeSlotIndex > 0 {
 				prevSlotIndex := sort.Search(nodeSlotIndex, func(i int) bool {
 					prevNode := t.data[t.frequency[i]]
-					return prevNode.Count < node.Count || prevNode.AccessTime < node.AccessTime
+					if prevNode.Count < node.Count {
+						return true
+					} else if prevNode.Count == node.Count {
+						if prevNode.AccessTime < node.AccessTime {
+							return true
+						}
+					}
+					return false
 				})
 
 				// 时间小于当前node，则当前node可以被认为是更活跃的，将当前node移动到data数组的左侧一位
@@ -123,13 +130,21 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 			}
 		} else {
 			// 数据量更低的时候，线性会更快一些
-			for range t.frequency { // 无限向前排序
+			for range t.frequency { // 无限向前搜索并排序
 				prevSlotIndex := node.SlotIndex - 1
 				nodeSlotIndex := node.SlotIndex
 				if prevSlotIndex > -1 {
 					prevNode := t.data[t.frequency[prevSlotIndex]]
 					// 时间小于当前node，则当前node可以被认为是更活跃的，将当前node移动到data数组的左侧一位
-					if prevNode != nil && ((prevNode.Count < node.Count) || ((prevNode.AccessTime) < (node.AccessTime))) {
+					var needSwitch bool
+					if prevNode.Count < node.Count {
+						needSwitch = true
+					} else if prevNode.Count == node.Count {
+						if prevNode.AccessTime < node.AccessTime {
+							needSwitch = true
+						}
+					}
+					if prevNode != nil && needSwitch {
 						prevNodeKey := t.frequency[prevSlotIndex]
 						t.frequency[prevSlotIndex] = key
 						t.frequency[nodeSlotIndex] = prevNodeKey
