@@ -99,7 +99,7 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 		node.AccessTime = time.Now().UnixNano()
 
 		if t.size > 2048 {
-			// 数据量更大的时候，sort.Search内置的多种算法会更快一些
+			// 数据量更大的时候，sort.Search内置的算法会更快一些
 			nodeSlotIndex := node.SlotIndex
 			if nodeSlotIndex > 0 {
 				prevSlotIndex := sort.Search(nodeSlotIndex, func(i int) bool {
