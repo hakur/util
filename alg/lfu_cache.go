@@ -12,7 +12,7 @@ var (
 
 // NewLFUCache create new lfu cache with pre allocated size, but with some garbage collection, there is extra memory "in use"
 // NewLFUCache 新建固定大小的lfu缓存, 因为GC的问题导致看起来有一些额外的内存“占用”
-func NewLFUCache[KT string | int, VT any](size int) (t *LFUCache[KT, VT]) {
+func NewLFUCache[KT comparable, VT any](size int) (t *LFUCache[KT, VT]) {
 	t = new(LFUCache[KT, VT])
 	t.size = size
 	t.frequency = make([]KT, 0, size) // 保证slice的底层数组是同一个
@@ -36,7 +36,7 @@ type LFUCacheNode[VT any] struct {
 
 // LFUCache thread safe latest frequency use cache, when add lock to NewLFUCache instance, must use sync.Mutex
 // LFUCache 非线程安全的LFU缓存,对 NewLFUCache 产生的实例加锁时，务必使用互斥锁。
-type LFUCache[KT string | int, VT any] struct {
+type LFUCache[KT comparable, VT any] struct {
 	// frequency 链表，当插入新的值时，访问尾端节点的值，即得到应该应该操作那个key
 	frequency []KT
 	// data 实际数据存储
