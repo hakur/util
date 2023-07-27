@@ -82,8 +82,11 @@ func BenchmarkLFUCachePut(b *testing.B) {
 
 func BenchmarkLFUCacheGet(b *testing.B) {
 	cache := NewLFUCache[int, int](400000)
-	cache.Put(100, 100)
+	for i := 0; i < 400000; i++ {
+		cache.Put(i, i)
+	}
+
 	for i := 0; i < b.N; i++ {
-		cache.Get(100)
+		cache.Get(399999)
 	}
 }
