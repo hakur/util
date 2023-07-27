@@ -5,7 +5,7 @@ package alg
 func NewObjectRingBuffer[T any](size int, dequeueCallback func(object T)) (t *ObjectRingBuffer[T]) {
 	t = new(ObjectRingBuffer[T])
 	t.Size = size
-	t.buffer = make([]T, size, size)
+	t.buffer = make([]T, size) // 永不扩容，预分配固定空间
 	return t
 }
 
