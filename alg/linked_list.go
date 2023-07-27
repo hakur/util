@@ -94,8 +94,8 @@ func (t *LinkedList[T]) Remove(node *LinkedListNode[T]) {
 		node.Next.Prev = node.Prev
 		node.Prev.Next = node.Next
 		// 脱链
-		node.Next.Prev = nil
-		node.Prev.Next = nil
+		node.Prev = nil
+		node.Next = nil
 	} else if node == t.Head { //node.Next != nil && node.Prev == nil { // 如果是移除头部元素
 		if node.Next != nil {
 			t.Head = node.Next
@@ -159,8 +159,8 @@ func (t *LinkedList[T]) SwapData(a, b *LinkedListNode[T]) {
 	if a == nil && b == nil {
 		return
 	}
-
-	c := &a.Data
-	b.Data = a.Data
-	a.Data = *c
+	a.Data, b.Data = b.Data, a.Data
+	// c := &a.Data
+	// b.Data = a.Data
+	// a.Data = *c
 }
