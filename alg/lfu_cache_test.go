@@ -86,7 +86,15 @@ func BenchmarkLFUCacheGet(b *testing.B) {
 		cache.Put(i, i)
 	}
 
-	for i := 0; i < b.N; i++ {
-		cache.Get(399999)
+	s := b.N
+	if s > 399999 {
+		s = 399999
 	}
+
+	var v int
+	for i := s; i >= s; i-- {
+		v, _ = cache.Get(i)
+	}
+
+	println(v)
 }

@@ -2,6 +2,7 @@ package alg
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -27,10 +28,11 @@ type LFUCacheNode[KT comparable, VT any] struct {
 	Value VT
 	// Count 访问次数统计，溢出后将成为新的值
 	Count uint64
-	// LinkedListNode 指向频率链表节点，用于排序
+	// LinkedListNode 指向频率链表节点，用于交换位置
 	LinkedListNode *LinkedListNode[KT]
 	// AccessTime 访问时间，使用简单的int64而不是复杂的time.Time
 	AccessTime int64
+	SlotIndex  int
 }
 
 // LFUCache thread safe latest frequency use cache, when add lock to NewLFUCache instance, must use sync.Mutex
@@ -38,6 +40,8 @@ type LFUCacheNode[KT comparable, VT any] struct {
 type LFUCache[KT comparable, VT any] struct {
 	// frequency 链表，当插入新的值时，访问尾端节点的值，即得到应该应该操作那个key
 	frequency *LinkedList[KT]
+	// slots 排序用的数组
+	slots []*LFUCacheNode[KT, VT]
 	// data 实际数据存储
 	data map[KT]*LFUCacheNode[KT, VT]
 	// size 缓存的最大长度
@@ -78,12 +82,16 @@ func (t *LFUCache[KT, VT]) Put(key KT, value VT) {
 		t.frequency.Append(NewLinkedListNode(key))
 	}
 
-	t.data[key] = &LFUCacheNode[KT, VT]{
+	node := &LFUCacheNode[KT, VT]{
 		Value:          value,
 		Count:          1,
 		LinkedListNode: t.frequency.Tail,
 		AccessTime:     time.Now().UnixNano(),
+		SlotIndex:      t.currentSize - 1,
 	}
+	t.data[key] = node
+
+	t.slots = append(t.slots, node)
 }
 
 // Get get value by key name
@@ -107,18 +115,20 @@ func (t *LFUCache[KT, VT]) frequencyInc(key KT) {
 	if node != nil {
 		node.Count++
 		node.AccessTime = time.Now().UnixNano()
-		for {
-			prevLinkListNode := node.LinkedListNode.Prev
-			if prevLinkListNode == nil {
-				break
-			}
-			prevNode := t.data[prevLinkListNode.Data]
-			if prevNode.Count < node.Count || prevNode.AccessTime < node.AccessTime {
-				node.LinkedListNode, prevNode.LinkedListNode = prevNode.LinkedListNode, node.LinkedListNode
-				t.frequency.SwapData(prevNode.LinkedListNode, node.LinkedListNode)
-			} else if prevNode.Count >= node.Count || prevNode.AccessTime > node.AccessTime {
-				break
-			}
+		if node.SlotIndex < 1 {
+			return
+		}
+
+		prevNodeIndex := sort.Search(node.SlotIndex, func(i int) bool {
+			return t.slots[i].SlotIndex < node.SlotIndex || t.slots[i].AccessTime < node.AccessTime
+		})
+
+		if prevNodeIndex < node.SlotIndex {
+			prevNode := t.slots[prevNodeIndex]
+			t.slots[node.SlotIndex], t.slots[prevNodeIndex] = t.slots[prevNodeIndex], t.slots[node.SlotIndex] // 交换排序指针
+			node.SlotIndex, prevNode.SlotIndex = prevNode.SlotIndex, node.SlotIndex                           // 交换排序的槽位
+			node.LinkedListNode, prevNode.LinkedListNode = prevNode.LinkedListNode, node.LinkedListNode       // 交换链表的值
+			t.frequency.SwapData(prevNode.LinkedListNode, node.LinkedListNode)                                // 交换链表的位置
 		}
 	}
 }
@@ -143,8 +153,8 @@ func (t *LFUCache[KT, VT]) GetTopHotKeys(topNum int) (keys []KT) {
 	return
 }
 
-// Delete delete key and update cache storage, this methos takes big cost
-// Delete 删除key并更新缓存存储， 这个接口消耗是巨大的
+// Delete delete key and update cache storage, do not forget call ptr variable's Close() method
+// Delete 删除key并更新缓存存储， 别忘了调用指针变量的 Close() 方法
 func (t *LFUCache[KT, VT]) Delete(key KT) {
 	var found bool
 	var node *LFUCacheNode[KT, VT]
@@ -153,5 +163,8 @@ func (t *LFUCache[KT, VT]) Delete(key KT) {
 	}
 	t.frequency.Remove(node.LinkedListNode)
 	delete(t.data, key)
+	t.slots[node.SlotIndex] = nil
+	t.slots = append(t.slots[:node.SlotIndex], t.slots[node.SlotIndex+1:]...)
+
 	t.currentSize--
 }
