@@ -1,6 +1,9 @@
 package alg
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 func NewLinkedListNode[T any](data T) (t *LinkedListNode[T]) {
 	t = new(LinkedListNode[T])
@@ -38,27 +41,41 @@ func (t *LinkedList[T]) GetSize() (size int) {
 }
 
 // Walk 从头到尾遍历链表，并且返回遍历之前的游标节点, 如果链表中没有数据，执行不执行遍历且返回值 oldCurrent 将会是nil
-func (t *LinkedList[T]) Walk(callback func(node *LinkedListNode[T]) (err error)) (oldCurrent *LinkedListNode[T], err error) {
+func (t *LinkedList[T]) Walk(callback func(node *LinkedListNode[T]) (err error)) (err error) {
 	if t.Current == nil {
-		return nil, fmt.Errorf("linked list is empty, could not walk")
+		return fmt.Errorf("linked list is empty, could not walk")
 	}
 
-	oldCurrent = t.Current
+	oldCurrent := t.Current
 	t.Current = t.Head
 	for t.Current != nil {
 		if err = callback(t.Current); err != nil {
-			return oldCurrent, err
+			t.Current = oldCurrent
+			return err
 		}
 		if t.Current.Next == nil {
 			break
 		}
 		t.Current = t.Current.Next
 	}
-	return oldCurrent, err
+	t.Current = oldCurrent
+	return err
+}
+
+func (t *LinkedList[T]) DumpData() (data []T) {
+	t.Walk(func(node *LinkedListNode[T]) (err error) {
+		data = append(data, node.Data)
+		return nil
+	})
+	return data
 }
 
 // Append 执行尾部插入
 func (t *LinkedList[T]) Append(node *LinkedListNode[T]) {
+	if node == nil {
+		return
+	}
+
 	if t.Tail != nil {
 		node.Prev = t.Tail
 		t.Tail.Next = node
@@ -101,6 +118,7 @@ func (t *LinkedList[T]) Remove(node *LinkedListNode[T]) {
 			t.Head = node.Next
 			// 脱链
 			node.Next.Prev = nil
+			node.Next = nil
 		}
 	} else if node == t.Tail { // node.Prev != nil && node.Next == nil { // 如果是移除尾部元素
 		if node.Prev != nil {
@@ -125,10 +143,78 @@ func (t *LinkedList[T]) Remove(node *LinkedListNode[T]) {
 
 // AppendAfter 在某个节点后插入
 func (t *LinkedList[T]) AppendAfter(node *LinkedListNode[T], newNode *LinkedListNode[T]) {
-	cNext := node.Next
-	node.Next = newNode
-	newNode.Prev = node
-	newNode.Next = cNext
+	if node == newNode || newNode == t.Head || newNode == t.Tail {
+		return
+	}
+
+	if node == t.Tail {
+		node.Next = newNode
+		newNode.Prev = node
+	} else {
+		node.Next.Prev = newNode
+		newNode.Next = node.Next
+		node.Next = newNode
+		newNode.Prev = node
+	}
+	t.size++
+}
+
+// AppendAfter 在某个前面插入
+func (t *LinkedList[T]) PrePend(node *LinkedListNode[T], newNode *LinkedListNode[T]) {
+	if node == newNode {
+		return
+	}
+
+	if node == t.Head {
+		t.Head = newNode
+		newNode.Next = node
+		node.Prev = newNode
+	} else {
+		newNode.Prev = node.Prev
+		newNode.Next = node
+		if node.Prev != nil {
+			node.Prev.Next = newNode
+		}
+		node.Prev = newNode
+	}
+	t.size++
+}
+
+// MovePrePend 将本条链表上的某个 node 节点移动到某个 targetNode 节点前面
+func (t *LinkedList[T]) MovePrePend(node *LinkedListNode[T], targetNode *LinkedListNode[T]) {
+	if node == targetNode {
+		return
+	}
+	t.Remove(node)
+	t.PrePend(targetNode, node)
+}
+
+// SearchFirstNode 搜索某个值第一次出现在链表的那个节点
+func (t *LinkedList[T]) SearchFirstNode(targetValue T) (node *LinkedListNode[T], err error) {
+	oldCurrent := t.Current
+	t.Current = t.Head
+
+	if t.Current == nil {
+		return nil, fmt.Errorf("linked list is empty, could not search")
+	}
+
+	oldCurrent = t.Current
+	t.Current = t.Head
+	var found bool
+	for t.Current != nil {
+		if reflect.DeepEqual(t.Current.Data, targetValue) {
+			node = t.Current
+			found = true
+			break
+		}
+		t.Current = t.Current.Next
+	}
+
+	t.Current = oldCurrent
+	if !found {
+		return nil, fmt.Errorf("searched value=%v not found in linked list", targetValue)
+	}
+	return
 }
 
 // Swap 交换链表两个元素的位置
