@@ -209,8 +209,7 @@ func (t *LFUCache[KT, VT]) Delete(key KT) {
 
 	t.removeNodeFromFrequencyGroup(node, node.Count) // 先从频率组移除
 	t.frequency.Remove(node.LinkedListNode)          // 然后再从链表上移除
-	// t.frequencyGroup[node.Count].Length--
-	delete(t.data, key) // 最后再从存储槽删除
+	delete(t.data, key)                              // 最后再从存储槽删除
 }
 
 func (t *LFUCache[KT, VT]) Debug() {
@@ -233,7 +232,7 @@ func (t *LFUCache[KT, VT]) Debug() {
 			"Length":   v.Length,
 		}
 	}
-	info["Group"] = group
+	info["FrequencyGroup"] = group
 
 	var linkedListData []KT
 	t.frequency.Walk(func(node *LinkedListNode[KT]) (err error) {

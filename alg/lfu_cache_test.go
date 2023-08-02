@@ -93,9 +93,37 @@ func TestLFUCacheTopHotKeys(t *testing.T) {
 		// println("----input ", i)
 		cache.Put(i, i)
 	}
-	cache.Debug()
+	// cache.Debug()
 
 	assert.Equal(t, []int{399997, 399998, 399999, 399996}, cache.GetTopHotKeys(4))
+}
+
+func TestLFUCacheDelete2(t *testing.T) {
+	cache := NewLFUCache[int, int](4)
+
+	for i := 0; i < 400000; i++ {
+		cache.Put(i, i)
+	}
+	assert.Equal(t, []int{399999, 399998, 399997, 399996}, cache.GetTopHotKeys(4))
+
+	for i := 400000; i >= 400000-4; i-- {
+		// input 400000 | 1 => 400000, 399999, 399998, 399997
+		// input 399999 | 1 => 400000, 399998, 399997 | 2 => 399999
+		// input 399998 | 1 => 400000, 399997 | 2 => 399998,399999
+		// input 399997 | 1 => 400000 | 2 => 399997, 399998, 399999
+		// input 399996 | 1 => 399996 | 2 => 399997, 399998, 399999
+		// linked list order -> 399997, 399998, 399999, 399996
+		// println("----input ", i)
+		cache.Put(i, i)
+	}
+	cache.Delete(399996)
+	assert.Equal(t, []int{399997, 399998, 399999}, cache.GetTopHotKeys(4))
+
+	cache.Get(399999)
+	assert.Equal(t, []int{399999, 399997, 399998}, cache.GetTopHotKeys(4))
+	cache.Put(399996, 399996)
+	assert.Equal(t, []int{399999, 399997, 399998, 399996}, cache.GetTopHotKeys(4))
+	// cache.Debug()
 }
 
 func BenchmarkLFUCachePut(b *testing.B) {
