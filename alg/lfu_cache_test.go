@@ -93,7 +93,7 @@ func TestLFUCacheTopHotKeys(t *testing.T) {
 		// println("----input ", i)
 		cache.Put(i, i)
 	}
-	// cache.Debug()
+	cache.Debug()
 
 	assert.Equal(t, []int{399997, 399998, 399999, 399996}, cache.GetTopHotKeys(4))
 }

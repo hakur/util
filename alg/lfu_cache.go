@@ -117,7 +117,7 @@ func (t *LFUCache[KT, VT]) frequencyInc(node *LFUCacheNode[KT, VT]) {
 		}
 		if node.Count > 1 { // 说明这不是初始化节点，是确确实实的节点频率增加了
 			t.frequency.MovePrePend(node.LinkedListNode, t.frequencyGroup[node.Count-1].Head) // 操作链表,插入到频率组头部节点的前面，因为当前节点的时间是最新的
-			t.removeNodeFromFrequencyGroup(node)                                              // 逃离旧的频率组
+			t.removeNodeFromFrequencyGroup(node, node.Count-1)                                // 逃离旧的频率组
 		}
 	} else {
 		// 存在就表示需要追加到新的位置上, 按访问频次和访问时间排序
@@ -125,13 +125,13 @@ func (t *LFUCache[KT, VT]) frequencyInc(node *LFUCacheNode[KT, VT]) {
 		t.frequencyGroup[node.Count].Head = node.LinkedListNode                         // 修改对应组的头部
 		t.frequencyGroup[node.Count].Length++                                           // 对应组的数量增加
 		if node.Count > 1 {                                                             // 说明这不是初始化节点，是确确实实的节点频率增加了
-			t.removeNodeFromFrequencyGroup(node) // 逃离旧的频率组
+			t.removeNodeFromFrequencyGroup(node, node.Count-1) // 逃离旧的频率组
 		}
 	}
 }
 
-func (t *LFUCache[KT, VT]) removeNodeFromFrequencyGroup(node *LFUCacheNode[KT, VT]) {
-	prevNodeGroupKey := node.Count - 1
+func (t *LFUCache[KT, VT]) removeNodeFromFrequencyGroup(node *LFUCacheNode[KT, VT], nodeGroupKey uint64) {
+	prevNodeGroupKey := nodeGroupKey // node.Count - 1
 	group := t.frequencyGroup[prevNodeGroupKey]
 	if group == nil {
 		return
@@ -172,6 +172,9 @@ func (t *LFUCache[KT, VT]) removeNodeFromFrequencyGroup(node *LFUCacheNode[KT, V
 		}
 	}
 
+	if group.Length == 1 {
+		group.Tail = group.Head
+	}
 }
 
 // GetTopHotKeys get most biggest access count of key
@@ -204,9 +207,10 @@ func (t *LFUCache[KT, VT]) Delete(key KT) {
 		return
 	}
 
-	t.removeNodeFromFrequencyGroup(node)    // 先从频率组移除
-	t.frequency.Remove(node.LinkedListNode) // 然后再从链表上移除
-	delete(t.data, key)                     // 最后再从存储槽删除
+	t.removeNodeFromFrequencyGroup(node, node.Count) // 先从频率组移除
+	t.frequency.Remove(node.LinkedListNode)          // 然后再从链表上移除
+	// t.frequencyGroup[node.Count].Length--
+	delete(t.data, key) // 最后再从存储槽删除
 }
 
 func (t *LFUCache[KT, VT]) Debug() {
@@ -221,11 +225,12 @@ func (t *LFUCache[KT, VT]) Debug() {
 	}
 	info["Data"] = data
 
-	var group = make(map[uint64]map[string]KT)
+	var group = make(map[uint64]map[string]any)
 	for k, v := range t.frequencyGroup {
-		group[k] = map[string]KT{
+		group[k] = map[string]any{
 			"HeadData": v.Head.Data,
 			"TailData": v.Tail.Data,
+			"Length":   v.Length,
 		}
 	}
 	info["Group"] = group
