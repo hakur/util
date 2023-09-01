@@ -44,12 +44,11 @@ func (t *ObjectRingBuffer[T]) Write(object T) {
 	}
 	t.buffer[t.writeOffset] = object
 
-	if t.writeOffset == t.readOffset {
+	if t.writeOffset == t.readOffset && t.Size == t.currentSize {
 		t.readOffset++
-	}
-
-	if t.readOffset >= t.currentSize {
-		t.readOffset = 0
+		if t.readOffset >= t.currentSize {
+			t.readOffset = 0
+		}
 	}
 
 	t.writeOffset++
