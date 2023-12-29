@@ -191,15 +191,13 @@ func (t *LinkedList[T]) MovePrePend(node *LinkedListNode[T], targetNode *LinkedL
 
 // SearchFirstNode 搜索某个值第一次出现在链表的那个节点
 func (t *LinkedList[T]) SearchFirstNode(targetValue T) (node *LinkedListNode[T], err error) {
-	oldCurrent := t.Current
+	var oldCurrent = t.Current
 	t.Current = t.Head
 
 	if t.Current == nil {
 		return nil, fmt.Errorf("linked list is empty, could not search")
 	}
 
-	oldCurrent = t.Current
-	t.Current = t.Head
 	var found bool
 	for t.Current != nil {
 		if reflect.DeepEqual(t.Current.Data, targetValue) {
