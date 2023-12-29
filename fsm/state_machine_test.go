@@ -8,7 +8,7 @@ import (
 )
 
 func TestStateMachineTransit(t *testing.T) {
-	sm := NewStateMachine()
+	sm := NewStateMachine("APP")
 	sm.SetStateUpdatedCallback(func(from, to State) {
 		println(fmt.Sprintf("--- state updated from %s to %s", from, to))
 	})
@@ -53,7 +53,7 @@ func TestStateMachineTransit(t *testing.T) {
 }
 
 func BenchmarkTransit(b *testing.B) {
-	sm := NewStateMachine()
+	sm := NewStateMachine("APP")
 
 	sm.AddState("idle", "walk", "run")
 	parameter := &Parameter{Name: "speed", Value: "0", Type: ParameterTypeFloat}
@@ -90,4 +90,21 @@ func BenchmarkTransit(b *testing.B) {
 	for i := 0; i <= b.N; i++ {
 		sm.Transit()
 	}
+}
+
+func TestGetMachine(t *testing.T) {
+	sm := NewStateMachine("Player")
+	motionSM := NewStateMachine("Motion")
+	sm.AddSubMachine(motionSM)
+	groundSM := NewStateMachine("Ground")
+	motionSM.AddSubMachine(groundSM)
+
+	flySM := NewStateMachine("Fly")
+	motionSM.AddSubMachine(flySM)
+
+	s := sm.GetMachine("Player/Motion/Ground")
+	assert.Equal(t, groundSM.Name, s.Name)
+
+	s = sm.GetMachine("/Player/Motion/Fly")
+	assert.Equal(t, flySM.Name, s.Name)
 }

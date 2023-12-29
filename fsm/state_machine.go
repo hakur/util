@@ -2,17 +2,20 @@ package fsm
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
 type State = string
 
-func NewStateMachine() *StateMachine {
+func NewStateMachine(name string) *StateMachine {
 	t := new(StateMachine)
 	t.Parameters = make(map[string]*Parameter)
 	t.ParametersLink = make(map[*Parameter][]*Transition)
 	t.Transitions = make(map[string]*Transition)
+	t.SubMachines = make(map[string]*StateMachine)
 	t.CurrentState = "Entry"
+	t.Name = name
 	return t
 }
 
@@ -178,12 +181,24 @@ func (t *StateMachine) RemoveParameter(parameterName string) {
 }
 
 // GetMachine 取得状态机，参数形如 /App/Game/Match，如果不存在则会返回空指针
-// func (t *StateMachine) GetMachine(namepath string) (sm *StateMachine) {
-// 	namepath = strings.TrimPrefix(namepath, "/")
-// 	namepath = strings.TrimSuffix(namepath, "/")
-// 	arr := strings.Split(namepath, "/")
-// 	if len(arr) > 0 {
-
-// 	}
-// 	return sm
-// }
+func (t *StateMachine) GetMachine(namepath string) (sm *StateMachine) {
+	namepath = strings.TrimPrefix(namepath, "/")
+	namepath = strings.TrimSuffix(namepath, "/")
+	arr := strings.Split(namepath, "/")
+	if len(arr) > 0 {
+		if len(arr) == 1 {
+			if t.Name == arr[0] {
+				return t
+			}
+		} else {
+			if t.Name == arr[0] {
+				for _, ssm := range t.SubMachines {
+					if ssm.Name == arr[1] {
+						return ssm.GetMachine("/" + strings.Join(arr[1:], "/"))
+					}
+				}
+			}
+		}
+	}
+	return sm
+}
