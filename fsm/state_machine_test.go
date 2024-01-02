@@ -8,19 +8,22 @@ import (
 )
 
 func TestStateMachineTransit(t *testing.T) {
+	var err error
 	sm := NewStateMachine("APP")
 	sm.SetStateUpdatedCallback(func(from, to State) {
 		println(fmt.Sprintf("--- state updated from %s to %s", from, to))
 	})
 
-	sm.AddState("idle", "walk", "run")
+	sm.AddValidTransition("idle", []State{"walk", "run"})
+	sm.AddValidTransition("walk", []State{"idle", "run"})
+	sm.AddValidTransition("run", []State{"walk"})
 	parameter := &Parameter{Name: "speed", Value: "0", Type: ParameterTypeFloat}
 	sm.AddParameter(parameter)
 
-	sm.Transit()
+	sm.AutoTransit()
 	assert.Equal(t, "idle", sm.CurrentState)
 
-	sm.AddTransition(&Transition{Name: "idle_walk", From: "idle", To: "walk", Conditions: map[string]ICondition{
+	err = sm.AddAutoTransition(&Transition{Name: "idle_walk", From: "idle", To: "walk", Conditions: map[string]ICondition{
 		"group id": &ConditionGroup{
 			Conditions: map[string]ICondition{
 				"random id": &Condition{
@@ -37,13 +40,16 @@ func TestStateMachineTransit(t *testing.T) {
 			CompareType: ConditionGroupCompareTypeAnd,
 		},
 	}}, parameter)
-	sm.AddTransition(&Transition{Name: "walk_run", From: "walk", To: "run", Conditions: map[string]ICondition{
+	assert.Equal(t, nil, err)
+
+	err = sm.AddAutoTransition(&Transition{Name: "walk_run", From: "walk", To: "run", Conditions: map[string]ICondition{
 		"random id": &Condition{
 			CompareType:   CompareTypeGreater,
 			Value:         "5",
 			ParameterName: "speed",
 		},
 	}}, parameter)
+	assert.Equal(t, nil, err)
 
 	sm.SetParameterValue("speed", "4.9")
 	assert.Equal(t, "walk", sm.CurrentState)
@@ -55,12 +61,14 @@ func TestStateMachineTransit(t *testing.T) {
 func BenchmarkTransit(b *testing.B) {
 	sm := NewStateMachine("APP")
 
-	sm.AddState("idle", "walk", "run")
+	sm.AddValidTransition("idle", []State{"walk", "run"})
+	sm.AddValidTransition("walk", []State{"idle", "run"})
+	sm.AddValidTransition("run", []State{"walk"})
 	parameter := &Parameter{Name: "speed", Value: "0", Type: ParameterTypeFloat}
 	sm.AddParameter(parameter)
-	sm.Transit()
+	sm.AutoTransit()
 
-	sm.AddTransition(&Transition{Name: "idle_walk", From: "idle", To: "walk", Conditions: map[string]ICondition{
+	sm.AddAutoTransition(&Transition{Name: "idle_walk", From: "idle", To: "walk", Conditions: map[string]ICondition{
 		"group id": &ConditionGroup{
 			Conditions: map[string]ICondition{
 				"random id": &Condition{
@@ -76,7 +84,7 @@ func BenchmarkTransit(b *testing.B) {
 			},
 		},
 	}}, parameter)
-	sm.AddTransition(&Transition{Name: "walk_run", From: "walk", To: "run", Conditions: map[string]ICondition{
+	sm.AddAutoTransition(&Transition{Name: "walk_run", From: "walk", To: "run", Conditions: map[string]ICondition{
 		"random id": &Condition{
 			CompareType:   CompareTypeGreater,
 			Value:         "5",
@@ -88,7 +96,7 @@ func BenchmarkTransit(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i <= b.N; i++ {
-		sm.Transit()
+		sm.AutoTransit()
 	}
 }
 

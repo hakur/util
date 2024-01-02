@@ -2,6 +2,7 @@ package fsm
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -14,6 +15,7 @@ func NewStateMachine(name string) *StateMachine {
 	t.ParametersLink = make(map[*Parameter][]*Transition)
 	t.Transitions = make(map[string]*Transition)
 	t.SubMachines = make(map[string]*StateMachine)
+	t.ValidTransition = make(map[string][]string)
 	t.CurrentState = "Entry"
 	t.Name = name
 	return t
@@ -26,6 +28,8 @@ type StateMachine struct {
 	Parameters map[string]*Parameter
 	// States 所有状态列表
 	States []State
+	// ValidTransition 针对自动状态转换 Transitions 字段所做的约束
+	ValidTransition map[State][]State
 	// CurrentState 当前状态
 	CurrentState State
 	// Transitions 转换器列表
@@ -71,31 +75,63 @@ func (t *StateMachine) GetParameter(parameterName string) (parameter *Parameter)
 	return
 }
 
-func (t *StateMachine) AddState(states ...State) (err error) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
+func (t *StateMachine) addState(states ...State) {
 	for _, state := range states {
-		for _, s := range t.States {
-			if s == state {
-				return fmt.Errorf("state=%s already exists", state)
-			}
+		if slices.Contains(t.States, state) {
+			continue
 		}
 
 		t.States = append(t.States, state)
 	}
-
-	return
 }
 
-// AddTransition 添加自动状态切换
-func (t *StateMachine) AddTransition(trans *Transition, parameter *Parameter) (err error) {
+// AddValidTransition 添加状态切换范围约束，即一个状态可以切换为哪些状态
+func (t *StateMachine) AddValidTransition(fromState State, toStates []State) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	t.addValidTransition(fromState, toStates)
+}
+
+func (t *StateMachine) addValidTransition(fromState State, toStates []State) {
+	if _, ok := t.ValidTransition[fromState]; !ok {
+		t.ValidTransition[fromState] = make([]string, 1)
+	}
+
+	t.addState(fromState)
+
+	for _, toState := range toStates {
+		if slices.Contains(t.ValidTransition[fromState], toState) {
+			continue
+		}
+		t.ValidTransition[fromState] = append(t.ValidTransition[fromState], toState)
+		t.addState(toState)
+	}
+}
+
+// checkTransitionValid 检查状态切换是否合法
+func (t *StateMachine) checkTransitionValid(fromState State, toState State) bool {
+	if _, ok := t.ValidTransition[fromState]; ok {
+		if slices.Contains(t.ValidTransition[fromState], toState) {
+			return true
+		}
+	}
+	return false
+}
+
+// AddAutoTransition 添加自动状态切换
+func (t *StateMachine) AddAutoTransition(trans *Transition, parameter *Parameter) (err error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if !t.checkTransitionValid(trans.From, trans.To) {
+		return fmt.Errorf("transition=%s fromState=%s toState=%s was not registered in valid transition set", trans.Name, trans.From, trans.To)
+	}
 
 	if _, ok := t.Transitions[trans.Name]; ok {
 		return fmt.Errorf("transition=%s already exists", trans.Name)
 	}
+
+	t.addValidTransition(trans.From, []State{trans.To})
 
 	t.Transitions[trans.Name] = trans
 	t.ParametersLink[parameter] = append(t.ParametersLink[parameter], trans)
@@ -103,8 +139,52 @@ func (t *StateMachine) AddTransition(trans *Transition, parameter *Parameter) (e
 	return
 }
 
+// RemoveAutoTransition 移除自动状态转换
+func (t *StateMachine) RemoveAutoTransition(transitionName string) {
+	transition, ok := t.Transitions[transitionName]
+	if !ok {
+		return
+	}
+
+	for parameter := range t.ParametersLink {
+		for k, trans := range t.ParametersLink[parameter] {
+			if trans == transition {
+				slices.Delete(t.ParametersLink[parameter], k, k+1)
+			}
+		}
+		if len(t.ParametersLink[parameter]) < 1 {
+			delete(t.ParametersLink, parameter)
+		}
+	}
+
+	delete(t.Transitions, transitionName)
+}
+
+// SetState 手动设置状态机状态，但会检查条件是否满足
+func (t *StateMachine) SetState(toState State) (err error) {
+	if t.checkTransitionValid(t.CurrentState, toState) {
+		return fmt.Errorf("SetState fromState=%s toState=%s was not registered in valid transition set", t.CurrentState, toState)
+	}
+
+	// 查找条件约束
+	var transSet []*Transition
+	for _, trans := range t.Transitions {
+		if trans.From == t.CurrentState && trans.To == toState {
+			transSet = append(transSet, trans)
+		}
+	}
+
+	if len(transSet) > 0 {
+		t.autoTransit(transSet)
+	} else {
+		t.CurrentState = toState
+	}
+
+	return nil
+}
+
 // Transit 手动检查所有的状态切换是否需要进行一次状态切换
-func (t *StateMachine) Transit() {
+func (t *StateMachine) AutoTransit() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -120,10 +200,10 @@ func (t *StateMachine) Transit() {
 		transitions = append(transitions, trans)
 	}
 
-	t.transit(transitions)
+	t.autoTransit(transitions)
 }
 
-func (t *StateMachine) transit(transitions []*Transition) {
+func (t *StateMachine) autoTransit(transitions []*Transition) {
 	for _, trans := range transitions {
 		if toState := trans.Transit(t.Parameters); toState != "" && toState != t.CurrentState {
 			var oldState = t.CurrentState
@@ -150,6 +230,17 @@ func (t *StateMachine) AddParameter(parameter *Parameter) (err error) {
 	return
 }
 
+func (t *StateMachine) RemoveParameter(parameterName string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	parameter := t.GetParameter(parameterName)
+	if parameter != nil {
+		delete(t.Parameters, parameterName)
+		delete(t.ParametersLink, parameter)
+	}
+}
+
 // SetParameterValue 设置参数值并自动切换对应的状态
 func (t *StateMachine) SetParameterValue(parameterName string, value string) (err error) {
 	t.lock.Lock()
@@ -163,21 +254,10 @@ func (t *StateMachine) SetParameterValue(parameterName string, value string) (er
 	parameter.Value = value
 
 	if transitions, ok := t.ParametersLink[parameter]; ok {
-		t.transit(transitions)
+		t.autoTransit(transitions)
 	}
 
 	return
-}
-
-func (t *StateMachine) RemoveParameter(parameterName string) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	parameter := t.GetParameter(parameterName)
-	delete(t.Parameters, parameterName)
-	if parameter != nil {
-		delete(t.ParametersLink, parameter)
-	}
 }
 
 // GetMachine 取得状态机，参数形如 /App/Game/Match，如果不存在则会返回空指针
