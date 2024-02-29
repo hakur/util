@@ -11,6 +11,8 @@ func TestBitmapPut(t *testing.T) {
 	bm.Put(1)
 	bm.Put(4)
 	bm.Put(999)
+	bm.Put(-77777)
+	assert.Equal(t, true, bm.Exist(-77777))
 	assert.Equal(t, true, bm.Exist(4))
 	assert.Equal(t, false, bm.Exist(5))
 	assert.Equal(t, false, bm.Exist(3))
@@ -18,6 +20,12 @@ func TestBitmapPut(t *testing.T) {
 	assert.Equal(t, false, bm.Exist(888))
 	bm.Remove(999)
 	assert.Equal(t, false, bm.Exist(999))
+}
+
+func TestBitmapPutOverSlot(t *testing.T) {
+	bm := NewBitmap[int32](1)
+	bm.Put(9)
+	assert.Equal(t, false, bm.Exist(9))
 }
 
 func BenchmarkBitmapPut(b *testing.B) {
