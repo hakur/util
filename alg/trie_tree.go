@@ -47,8 +47,10 @@ func (t *TrieTree) Insert(words []byte) {
 	defer t.lock.Unlock()
 
 	nextNode := t.Root
-	for height, w := range words {
-		nextNode = t.inertWord(nextNode, w, height)
+	// for height, w := range words {
+	for _, w := range words {
+		// nextNode = t.inertWord(nextNode, w, height)
+		nextNode = t.inertWord(nextNode, w)
 	}
 }
 
@@ -59,8 +61,10 @@ func (t *TrieTree) Match(words []byte) (matched []byte) {
 	defer t.lock.RUnlock()
 
 	matchedNode := t.Root
-	for height, w := range words {
-		matchedNode = t.searchNode(matchedNode, w, height)
+	// for height, w := range words {
+	for _, w := range words {
+		// matchedNode = t.searchNode(matchedNode, w, height)
+		matchedNode = t.searchNode(matchedNode, w)
 		if matchedNode != nil {
 			matched = append(matched, matchedNode.Data)
 		} else {
@@ -71,7 +75,8 @@ func (t *TrieTree) Match(words []byte) (matched []byte) {
 	return matched
 }
 
-func (t *TrieTree) inertWord(startNode *TrieTreeNode, data byte, height int) (nextNode *TrieTreeNode) {
+// func (t *TrieTree) inertWord(startNode *TrieTreeNode, data byte, height int) (nextNode *TrieTreeNode) {
+func (t *TrieTree) inertWord(startNode *TrieTreeNode, data byte) (nextNode *TrieTreeNode) {
 	var index int
 	var found bool
 	var childCount = len(startNode.Children)
@@ -103,7 +108,8 @@ func (t *TrieTree) inertWord(startNode *TrieTreeNode, data byte, height int) (ne
 	return
 }
 
-func (t *TrieTree) searchNode(startNode *TrieTreeNode, data byte, height int) (matchedNode *TrieTreeNode) {
+// func (t *TrieTree) searchNode(startNode *TrieTreeNode, data byte, height int) (matchedNode *TrieTreeNode) {
+func (t *TrieTree) searchNode(startNode *TrieTreeNode, data byte) (matchedNode *TrieTreeNode) {
 	var index int
 	var found bool
 	var childCount = len(startNode.Children)
@@ -130,8 +136,10 @@ func (t *TrieTree) Delete(words []byte) {
 	defer t.lock.Unlock()
 
 	var matchedNodes []*TrieTreeNode
-	for height, w := range words {
-		matchedNode := t.searchNode(t.Root, w, height)
+	// for height, w := range words {
+	for _, w := range words {
+		// matchedNode := t.searchNode(t.Root, w, height)
+		matchedNode := t.searchNode(t.Root, w)
 		if matchedNode != nil {
 			matchedNodes = append(matchedNodes, matchedNode)
 		} else {
