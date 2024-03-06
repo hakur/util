@@ -1,33 +1,36 @@
 package alg
 
-// NewStack create new  non thread safe stack data structure
-// NewStack 新建非线程安全的栈结构
-func NewStack[T any]() (t *Stack[T]) {
-	t = new(Stack[T])
+// NewArrayStack create new non thread safe ArrayStack data structure
+// NewArrayStack 新建非线程安全的栈结构
+func NewArrayStack[T any]() (t *ArrayStack[T]) {
+	t = new(ArrayStack[T])
 	return t
 }
 
-// Stack non thread safe, slice array stack data structure
-// Stack 非线程安全，基于数组切片的栈结构
-type Stack[T any] struct {
+// ArrayStack non thread safe, slice array ArrayStack data structure
+// ArrayStack 非线程安全，基于数组切片的栈结构
+type ArrayStack[T any] struct {
 	Data []T
 }
 
-// IsEmpty check if stack is empty, when stack bottom has no value, stack is empty
-// IsEmpty 检查栈是否为空，当栈顶没有元素就是空的
-func (t *Stack[T]) IsEmpty() bool {
+// IsEmpty check if ArrayStack is empty
+// IsEmpty 检查栈是否为空
+func (t *ArrayStack[T]) IsEmpty() bool {
+	if t.Data == nil {
+		return true
+	}
 	return len(t.Data) == 0
 }
 
-// Push push element to stack top
+// Push push element to ArrayStack top
 // Push 元素入栈
-func (t *Stack[T]) Push(data ...T) {
+func (t *ArrayStack[T]) Push(data ...T) {
 	t.Data = append(t.Data, data...)
 }
 
-// Push remove element from stack top
+// Push remove element from ArrayStack top
 // Push 元素出栈
-func (t *Stack[T]) Pop() (data T) {
+func (t *ArrayStack[T]) Pop() (data T) {
 	length := len(t.Data)
 	if length > 0 {
 		data = t.Data[length-1]
@@ -36,9 +39,9 @@ func (t *Stack[T]) Pop() (data T) {
 	return data
 }
 
-// Push remove all elements from stack
+// Push remove all elements from ArrayStack
 // Push 所有元素入栈
-func (t *Stack[T]) PopAll(callback func(data T)) {
+func (t *ArrayStack[T]) PopAll(callback func(data T)) {
 	for !t.IsEmpty() {
 		if callback != nil {
 			callback(t.Pop())
@@ -48,8 +51,71 @@ func (t *Stack[T]) PopAll(callback func(data T)) {
 	}
 }
 
-// Destroy set stack top to nil, waiting for GC collect stack's single linked list
+// Destroy set ArrayStack to nil, should not use ArrayStack after destroy
+// Destroy 设置栈为空指针, 摧毁之后不应继续使用
+func (t *ArrayStack[T]) Destroy() {
+	t.Data = nil
+}
+
+// NewLinkedListStack create new  non thread safe LinkedListStack data structure
+// NewLinkedListStack 新建非线程安全的栈结构
+func NewLinkedListStack[T any]() (t *LinkedListStack[T]) {
+	t = new(LinkedListStack[T])
+	return t
+}
+
+type LinkedListStackNode[T any] struct {
+	Data T
+	Prev *LinkedListStackNode[T]
+}
+
+// LinkedListStack non thread safe, LinkedListStack data structure in single linked list , not slice or array (array slice GC reference problem)
+// LinkedListStack 非线程安全，基于单向链表的栈结构，非slice或数组(数组切片会导致GC无法回收问题)
+type LinkedListStack[T any] struct {
+	Top *LinkedListStackNode[T]
+}
+
+// IsEmpty check if LinkedListStack is empty, when LinkedListStack bottom has no value, LinkedListStack is empty
+// IsEmpty 检查栈是否为空，当栈顶没有元素就是空的
+func (t *LinkedListStack[T]) IsEmpty() bool {
+	return t.Top == nil
+}
+
+// Push push element to LinkedListStack top
+// Push 元素入栈
+func (t *LinkedListStack[T]) Push(data ...T) {
+	for k := range data {
+		t.Top = &LinkedListStackNode[T]{
+			Prev: t.Top,
+			Data: data[k],
+		}
+	}
+}
+
+// Push remove element from LinkedListStack top
+// Push 元素出栈
+func (t *LinkedListStack[T]) Pop() (data T) {
+	if t.Top != nil {
+		data = t.Top.Data
+		t.Top = t.Top.Prev
+	}
+	return data
+}
+
+// Push remove all elements from LinkedListStack
+// Push 所有元素入栈
+func (t *LinkedListStack[T]) PopAll(callback func(data T)) {
+	for t.Top != nil {
+		if callback != nil {
+			callback(t.Pop())
+		} else {
+			t.Pop()
+		}
+	}
+}
+
+// Destroy set LinkedListStack top to nil, waiting for GC collect LinkedListStack's single linked list
 // Destroy 设置栈顶为空指针, 等待GC回收链表
-func (t *Stack[T]) Destroy() {
-	t.Data = make([]T, 0)
+func (t *LinkedListStack[T]) Destroy() {
+	t.Top = nil
 }
