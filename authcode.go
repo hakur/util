@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -49,7 +48,7 @@ func AuthCode(str string, operation string, key string, expiry int64) string {
 		str = strings.Replace(str, "_", "/", -1)
 		strByte, err := base64.StdEncoding.DecodeString(str[ckeyLength:])
 		if err != nil {
-			log.Fatal(err)
+			return ""
 		}
 		str = string(strByte)
 	} else {
