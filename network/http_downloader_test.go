@@ -19,11 +19,11 @@ func TestHttpDownload(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	var checksumFile = "b:/kubernetes-node-linux-arm64.tar.gz.sha256"
-	err = dl.Download(ctx, "https://dl.k8s.io/v1.23.3/kubernetes-node-linux-arm64.tar.gz.sha256", checksumFile, "")
+	err = dl.Download(ctx, &DownloadOpts{FileURL: "https://dl.k8s.io/v1.23.3/kubernetes-node-linux-arm64.tar.gz.sha256", OutputFilename: checksumFile, Checksum: ""})
 	assert.Equal(t, nil, err)
 
 	buf, err := os.ReadFile(checksumFile)
 	assert.Equal(t, nil, err)
-	err = dl.Download(ctx, "https://dl.k8s.io/v1.23.3/kubernetes-node-linux-arm64.tar.gz", "b:/kubernetes-node-linux-arm64.tar.gz", "sha256:"+string(buf))
+	err = dl.Download(ctx, &DownloadOpts{FileURL: "https://dl.k8s.io/v1.23.3/kubernetes-node-linux-arm64.tar.gz", OutputFilename: "b:/kubernetes-node-linux-arm64.tar.gz", Checksum: "sha256:" + string(buf)})
 	assert.Equal(t, nil, err)
 }

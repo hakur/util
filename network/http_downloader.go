@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -43,6 +44,14 @@ type HttpDownloaderOpts struct {
 	ProxyAddr string
 }
 
+type DownloadOpts struct {
+	FileURL        string
+	OutputFilename string
+	Checksum       string
+	TotalSizeChan  chan int64
+	Cookie         string
+}
+
 type HttpDownloader struct {
 	Opts           *HttpDownloaderOpts
 	Client         *http.Client
@@ -50,15 +59,15 @@ type HttpDownloader struct {
 	// WorkerCount    int
 }
 
-func (t *HttpDownloader) Download(ctx context.Context, fileURL string, outputFilename string, cheksum string) (err error) {
-	f, fi, err := t.prepareOutputFile(outputFilename)
+func (t *HttpDownloader) Download(ctx context.Context, opts *DownloadOpts) (err error) {
+	f, fi, err := t.prepareOutputFile(opts.OutputFilename)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	if cheksum != "" {
-		verifyOk, err := t.verifyChecksum(f, cheksum)
+	if opts.Checksum != "" {
+		verifyOk, err := t.verifyChecksum(f, opts.Checksum)
 		if verifyOk {
 			return nil
 		} else if errors.Is(err, ErrUnknownChecksumType) {
@@ -66,7 +75,7 @@ func (t *HttpDownloader) Download(ctx context.Context, fileURL string, outputFil
 		}
 	}
 
-	req, err := t.prepareReuqest(ctx, fileURL, fi.Size(), true)
+	req, err := t.prepareReuqest(ctx, opts.FileURL, fi.Size(), true)
 	if err != nil {
 		return
 	}
@@ -75,13 +84,13 @@ func (t *HttpDownloader) Download(ctx context.Context, fileURL string, outputFil
 	if err != nil {
 		return
 	}
-	if resp.StatusCode == 501 { // 501 Unsupported client range
+	if resp.StatusCode == 501 || resp.StatusCode != 206 { // 501 Unsupported client range
 		resp.Body.Close()
 		if err = f.Truncate(0); err != nil {
 			return err
 		}
 
-		req, err = t.prepareReuqest(ctx, fileURL, fi.Size(), false)
+		req, err = t.prepareReuqest(ctx, opts.FileURL, fi.Size(), false)
 		if err != nil {
 			return
 		}
@@ -91,6 +100,11 @@ func (t *HttpDownloader) Download(ctx context.Context, fileURL string, outputFil
 		}
 	}
 	defer resp.Body.Close()
+
+	contentLength, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
+	if opts.TotalSizeChan != nil {
+		opts.TotalSizeChan <- contentLength
+	}
 
 	errChan := make(chan error)
 	doneChan := make(chan struct{})
