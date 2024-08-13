@@ -81,7 +81,7 @@ func ReadDirRecusive(path string, callback func(filePath string) (err error)) (e
 		}
 
 		if fi.IsDir() {
-			ReadDirRecusive(filepath, callback)
+			return ReadDirRecusive(filepath, callback)
 		}
 	}
 
