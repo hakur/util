@@ -8,8 +8,21 @@ import (
 )
 
 func TestPackUInt(t *testing.T) {
-	packed := PackInt[int32](3, math.MaxInt32)
-	println(packed, packed>>32, uint32(packed))
+	packed := PackUInt[uint32](3, math.MaxUint32)
+	assert.Equal(t, 3, int(packed>>32))
+	assert.Equal(t, math.MaxUint32, int(packed&0xFFFFFFFF))
+
+	packed = PackUInt[uint32](3, 7)
+	assert.Equal(t, 3, int(packed>>32))
+	assert.Equal(t, 7, int(packed&0xFFFFFFFF))
+
+	packed = PackUInt[uint16](3, 7)
+	assert.Equal(t, 3, int(packed>>32))
+	assert.Equal(t, 7, int(packed&0xFFFFFFFF))
+
+	packed = PackUInt[uint8](3, 7)
+	assert.Equal(t, 3, int(packed>>32))
+	assert.Equal(t, 7, int(packed&0xFFFFFFFF))
 }
 
 func TestLittleToBigEndian(t *testing.T) {

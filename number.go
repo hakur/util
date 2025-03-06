@@ -5,7 +5,11 @@ import (
 	"unsafe"
 )
 
-func PackInt[T int32 | int16 | int8 | uint32 | uint16 | uint8](hightBitNumber T, lowBitNumnber T) (packedNumber uint64) {
+// Combine two uint32 number
+// get high 32 bit number use packedNumber&&0xFFFFFFFF
+// get low 32 bit number use packedNumber>>32
+// example see numbertest.go#TestPackUInt
+func PackUInt[T uint32 | uint16 | uint8](hightBitNumber T, lowBitNumnber T) (packedNumber uint64) {
 	packedNumber = uint64(hightBitNumber)<<32 | uint64(lowBitNumnber)
 	return packedNumber
 }
