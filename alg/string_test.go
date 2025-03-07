@@ -8,4 +8,5 @@ import (
 
 func TestMaxNonRepeatSubString(t *testing.T) {
 	assert.Equal(t, "abcdefgh", MaxNonRepeatSubString("ababcdabcdefghabc"))
+	assert.Equal(t, "abc", MaxNonRepeatSubString("ababccc"))
 }
