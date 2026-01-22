@@ -92,3 +92,39 @@ func BenchmarkTrieTreeMatch(b *testing.B) {
 		tree.Match([]byte("192.168.3.6"))
 	}
 }
+
+func TestTrieTreeWalk(t *testing.T) {
+	tree := NewTrieTree()
+
+	tree.Insert([]byte("1.2.4/24"))
+	tree.Insert([]byte("1.2.3/24"))
+	tree.Insert([]byte("1.2.5/24"))
+	tree.Insert([]byte("1.3.5/24"))
+
+	var results [][]byte
+	count := 0
+	tree.Walk(func(line []byte) {
+		results = append(results, line)
+		count++
+	})
+
+	// 验证有结果
+	assert.Greater(t, count, 0)
+}
+
+func TestTrieTreeWalkSuffix(t *testing.T) {
+	tree := NewTrieTree()
+
+	tree.Insert([]byte("hello"))
+	tree.Insert([]byte("helloworld"))
+	tree.Insert([]byte("hellogo"))
+
+	var results []string
+	tree.WalkSuffix([]byte("hello"), func(line []byte) {
+		results = append(results, string(line))
+	}, 10)
+
+	// 应该包含 helloworld 和 hello
+	assert.Contains(t, results, "helloworld")
+	assert.Contains(t, results, "hello")
+}

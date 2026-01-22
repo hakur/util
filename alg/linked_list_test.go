@@ -1,6 +1,7 @@
 package alg
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -187,4 +188,98 @@ func TestLinktedListAppendAfter(t *testing.T) {
 	})
 
 	assert.Equal(t, []int{1, 7, 2, 3, 4}, data)
+}
+
+func TestSingleLinkedListReverse(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	for i := 1; i <= 4; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+
+	var data []int
+	list.Walk(func(node *SingleLinkedListNode[int]) (err error) {
+		data = append(data, node.Data)
+		return nil
+	})
+	assert.Equal(t, []int{1, 2, 3, 4}, data)
+
+	data = []int{}
+	list.Reverse()
+	list.Walk(func(node *SingleLinkedListNode[int]) (err error) {
+		data = append(data, node.Data)
+		return nil
+	})
+	assert.Equal(t, []int{4, 3, 2, 1}, data)
+}
+
+func TestSigleLinkedListSwap(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	for i := 1; i <= 4; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+
+	list.Swap(list.Head, list.Tail)
+	var data = []int{}
+	list.Walk(func(node *SingleLinkedListNode[int]) (err error) {
+		data = append(data, node.Data)
+		return nil
+	})
+
+	assert.Equal(t, []int{4, 2, 3, 1}, data)
+	fmt.Println(list.Head, list.Tail)
+}
+
+func TestSingleLinkedListGetSize(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	assert.Equal(t, 0, list.GetSize())
+
+	for i := 1; i <= 3; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+	assert.Equal(t, 3, list.GetSize())
+}
+
+func TestSingleLinkedListDumpData(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	for i := 1; i <= 3; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+	assert.Equal(t, []int{1, 2, 3}, list.DumpData())
+}
+
+func TestSingleLinkedListSearchFirstNode(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	for i := 1; i <= 3; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+
+	node, err := list.SearchFirstNode(2)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 2, node.Data)
+
+	_, err = list.SearchFirstNode(999)
+	assert.NotEqual(t, nil, err)
+}
+
+func TestSingleLinkedListRemove(t *testing.T) {
+	list := NewSingleLinkedList[int]()
+	for i := 1; i <= 5; i++ {
+		list.Append(NewSingleLinkedListNode(i))
+	}
+
+	// 移除中间节点
+	node, _ := list.SearchFirstNode(3)
+	list.Remove(node)
+	assert.Equal(t, 4, list.GetSize())
+	assert.Equal(t, []int{1, 2, 4, 5}, list.DumpData())
+
+	// 移除头部节点
+	list.Remove(list.Head)
+	assert.Equal(t, 3, list.GetSize())
+	assert.Equal(t, []int{2, 4, 5}, list.DumpData())
+
+	// 移除尾部节点
+	list.Remove(list.Tail)
+	assert.Equal(t, 2, list.GetSize())
+	assert.Equal(t, []int{2, 4}, list.DumpData())
 }

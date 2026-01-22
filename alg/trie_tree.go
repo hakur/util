@@ -136,19 +136,19 @@ func (t *TrieTree) Delete(words []byte) {
 	defer t.lock.Unlock()
 
 	var matchedNodes []*TrieTreeNode
-	// for height, w := range words {
+	currentNode := t.Root
 	for _, w := range words {
-		// matchedNode := t.searchNode(t.Root, w, height)
-		matchedNode := t.searchNode(t.Root, w)
+		matchedNode := t.searchNode(currentNode, w)
 		if matchedNode != nil {
 			matchedNodes = append(matchedNodes, matchedNode)
+			currentNode = matchedNode
 		} else {
 			break
 		}
 	}
 
 	for i := len(matchedNodes) - 1; i >= 0; i-- {
-		if i-1 < 1 {
+		if i == 0 {
 			t.deleteNode(t.Root, matchedNodes[i])
 		} else {
 			t.deleteNode(matchedNodes[i-1], matchedNodes[i])
@@ -174,38 +174,68 @@ func (t *TrieTree) deleteNode(parentNode, node *TrieTreeNode) {
 	}
 }
 
-// // Walk list all record combo from trie tree
-// func (t *TrieTree) Walk(f func(line []byte)) {
-// 	for _, child := range t.Root.Children {
-// 		for i := 0; i < child.RefCount; i++ {
-// 			f(t.walk(child, i+1, f))
-// 		}
-// 	}
-// }
-
-// // walk 从某个节点开始遍历
-// func (t *TrieTree) walk(node *TrieTreeNode, childIndex int, f func(line []byte)) (lineCollect []byte) {
-// 	lineCollect = append(lineCollect, node.Data)
-
-// 	if len(node.Children) > 0 {
-// 		var realChildIndex int
-// 		var totalRefCount int
-// 		for k, child := range node.Children {
-// 			if childIndex-totalRefCount == child.RefCount {
-// 				realChildIndex = k
-// 				break
-// 			} else {
-// 				totalRefCount += child.RefCount
-// 			}
-// 		}
-// 		lineCollect = append(lineCollect, t.walk(node.Children[realChildIndex], childIndex, f)...)
-// 	}
-
-// 	return lineCollect
-// }
-
 // WalkSuffix list all suffix by prefix, used for hot search keywords recommend
 // WalkSuffix 遍历剩余后缀,用于搜热词推荐
-// func (t *TrieTree) WalkSuffix(prefix []byte, f func(line []byte), count int) {
+func (t *TrieTree) WalkSuffix(prefix []byte, f func(line []byte), count int) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-// }
+	// 找到前缀对应的最后一个节点
+	currentNode := t.Root
+	for _, w := range prefix {
+		matchedNode := t.searchNode(currentNode, w)
+		if matchedNode == nil {
+			return // 前缀不存在
+		}
+		currentNode = matchedNode
+	}
+
+	// 从该节点开始遍历所有后缀
+	t.walkSuffix(currentNode, prefix, f, count)
+}
+
+// walkSuffix 递归遍历所有后缀
+func (t *TrieTree) walkSuffix(node *TrieTreeNode, prefix []byte, f func(line []byte), count int) {
+	if count <= 0 {
+		return
+	}
+
+	// 如果节点有数据，调用回调函数
+	if node.Data != 0 {
+		f(prefix)
+		count--
+	}
+
+	// 递归遍历所有子节点
+	for _, child := range node.Children {
+		if child != nil {
+			newPrefix := make([]byte, len(prefix)+1)
+			copy(newPrefix, prefix)
+			newPrefix[len(prefix)] = child.Data
+			t.walkSuffix(child, newPrefix, f, count)
+		}
+	}
+}
+
+// Walk list all record combo from trie tree
+// Walk 遍历所有记录
+func (t *TrieTree) Walk(f func(line []byte)) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	for _, child := range t.Root.Children {
+		t.walk(child, []byte{}, f)
+	}
+}
+
+// walk 从某个节点开始遍历
+func (t *TrieTree) walk(node *TrieTreeNode, prefix []byte, f func(line []byte)) {
+	currentPrefix := append(prefix, node.Data)
+	f(currentPrefix)
+
+	for _, child := range node.Children {
+		if child != nil {
+			t.walk(child, currentPrefix, f)
+		}
+	}
+}

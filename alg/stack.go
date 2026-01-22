@@ -28,8 +28,8 @@ func (t *ArrayStack[T]) Push(data ...T) {
 	t.Data = append(t.Data, data...)
 }
 
-// Push remove element from ArrayStack top
-// Push 元素出栈
+// Pop remove element from ArrayStack top
+// Pop 元素出栈
 func (t *ArrayStack[T]) Pop() (data T) {
 	length := len(t.Data)
 	if length > 0 {
@@ -39,8 +39,8 @@ func (t *ArrayStack[T]) Pop() (data T) {
 	return data
 }
 
-// Push remove all elements from ArrayStack
-// Push 所有元素入栈
+// PopAll remove all elements from ArrayStack
+// PopAll 所有元素入栈
 func (t *ArrayStack[T]) PopAll(callback func(data T)) {
 	for !t.IsEmpty() {
 		if callback != nil {
@@ -92,8 +92,8 @@ func (t *LinkedListStack[T]) Push(data ...T) {
 	}
 }
 
-// Push remove element from LinkedListStack top
-// Push 元素出栈
+// Pop remove element from LinkedListStack top
+// Pop 元素出栈
 func (t *LinkedListStack[T]) Pop() (data T) {
 	if t.Top != nil {
 		data = t.Top.Data
@@ -102,8 +102,8 @@ func (t *LinkedListStack[T]) Pop() (data T) {
 	return data
 }
 
-// Push remove all elements from LinkedListStack
-// Push 所有元素入栈
+// PopAll remove all elements from LinkedListStack
+// PopAll 所有元素入栈
 func (t *LinkedListStack[T]) PopAll(callback func(data T)) {
 	for t.Top != nil {
 		if callback != nil {

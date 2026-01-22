@@ -248,3 +248,134 @@ func (t *LinkedList[T]) SwapData(a, b *LinkedListNode[T]) {
 	// b.Data = a.Data
 	// a.Data = *c
 }
+
+func NewSingleLinkedListNode[T any](value T) (t *SingleLinkedListNode[T]) {
+	t = new(SingleLinkedListNode[T])
+	t.Data = value
+	return t
+}
+
+type SingleLinkedListNode[T any] struct {
+	// Data 节点数据
+	Data T
+	// Next 下一个节点，可能是空的
+	Next *SingleLinkedListNode[T]
+}
+
+func NewSingleLinkedList[T any]() (t *SingleLinkedList[T]) {
+	t = new(SingleLinkedList[T])
+	return t
+}
+
+type SingleLinkedList[T any] struct {
+	Head *SingleLinkedListNode[T]
+	Tail *SingleLinkedListNode[T]
+	// size 当前元素个数
+	size int
+}
+
+func (t *SingleLinkedList[T]) Append(node *SingleLinkedListNode[T]) {
+	if t.Tail != nil {
+		t.Tail.Next = node
+	}
+	t.Tail = node
+	if t.Head == nil {
+		t.Head = node
+	}
+	t.size++
+}
+
+// GetSize 返回当前长度
+func (t *SingleLinkedList[T]) GetSize() int {
+	return t.size
+}
+
+// DumpData 导出所有数据为切片
+func (t *SingleLinkedList[T]) DumpData() (data []T) {
+	t.Walk(func(node *SingleLinkedListNode[T]) (err error) {
+		data = append(data, node.Data)
+		return nil
+	})
+	return
+}
+
+func (t *SingleLinkedList[T]) Walk(f func(node *SingleLinkedListNode[T]) (err error)) {
+	var cur *SingleLinkedListNode[T]
+	var err error
+	cur = t.Head
+	for cur != nil {
+		if err = f(cur); err == nil {
+			cur = cur.Next
+		} else {
+			break
+		}
+	}
+}
+
+// SearchFirstNode 搜索某个值第一次出现在链表的那个节点
+func (t *SingleLinkedList[T]) SearchFirstNode(targetValue T) (node *SingleLinkedListNode[T], err error) {
+	cur := t.Head
+	for cur != nil {
+		if reflect.DeepEqual(cur.Data, targetValue) {
+			node = cur
+			return
+		}
+		cur = cur.Next
+	}
+	err = fmt.Errorf("searched value=%v not found in single linked list", targetValue)
+	return
+}
+
+// Remove 从链表上移除节点
+func (t *SingleLinkedList[T]) Remove(node *SingleLinkedListNode[T]) {
+	if t.Head == nil || node == nil {
+		return
+	}
+	if t.Head == node {
+		t.Head = node.Next
+		if t.Tail == node {
+			t.Tail = nil
+		}
+		t.size--
+		return
+	}
+	cur := t.Head
+	for cur.Next != nil {
+		if cur.Next == node {
+			cur.Next = node.Next
+			if t.Tail == node {
+				t.Tail = cur
+			}
+			t.size--
+			return
+		}
+		cur = cur.Next
+	}
+}
+
+// Swap 交换两个节点的内容
+func (t *SingleLinkedList[T]) Swap(a, b *SingleLinkedListNode[T]) {
+	if a == nil || b == nil {
+		return
+	}
+	a.Data, b.Data = b.Data, a.Data
+}
+
+// Reverse reverse this single linked list
+// Reverse 翻转这个链表
+func (t *SingleLinkedList[T]) Reverse() {
+	if t.Head == nil {
+		return
+	}
+	oldHead := t.Head
+	var prev, current, next *SingleLinkedListNode[T]
+	current = t.Head
+	for current != nil {
+		next = current.Next
+		current.Next = prev
+		prev = current
+		current = next
+	}
+	t.Head = prev
+	t.Tail = oldHead
+}
