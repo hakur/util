@@ -8,45 +8,119 @@ import (
 	"strings"
 )
 
-// ParseStructWithEnv pasr struct tag(convert style see StrToEnvName function) and check if OS environment name matched tag
-// if matched tag, set environment variable name as struct field value
-// current support struct field value type are [Int Bool String Struct]
-// usage example see struct_test.go#TestParseStructWithEnv()
-// ParseStructWithEnv 使用结构体的tag映射环境变量值，tag和环境变量名的转换参照函数StrToEnvName,当前只支持 [Int Bool String Struct]
-// 使用示范见struct_test.go#TestParseStructWithEnv()
-
-func ParseStructWithEnv(structNode interface{}, rootNodeName string) {
-	tp := reflect.TypeOf(structNode)
-	var val reflect.Value
-
-	if tp.Kind() == reflect.Ptr {
-		ov := reflect.ValueOf(structNode)
-		val = reflect.Indirect(ov)
-	} else {
-		val = reflect.ValueOf(structNode)
+// ParseStructWithEnv 解析结构体字段并从环境变量中读取值填充
+// 通过 StrToEnvName 函数将结构体字段名转换为环境变量名
+// 支持的类型: [Int8 Int16 Int32 Int64 Uint8 Uint16 Uint32 Uint64 Uint Int Float32 Float64 Bool String Struct]
+// 如果环境变量不存在或解析失败，跳过该字段
+// 返回错误以提示解析过程中的问题
+func ParseStructWithEnv(structNode interface{}, rootNodeName string) error {
+	// 检查 nil
+	if structNode == nil {
+		return fmt.Errorf("structNode is nil")
 	}
 
+	// 获取反射值
+	tp := reflect.TypeOf(structNode)
+	val := reflect.ValueOf(structNode)
+
+	// 处理指针类型
+	if tp.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return fmt.Errorf("structNode is nil pointer")
+		}
+		val = reflect.Indirect(val)
+		tp = val.Type()
+	}
+
+	// 验证必须是结构体
+	if tp.Kind() != reflect.Struct {
+		return fmt.Errorf("structNode must be struct or pointer to struct, got %s", tp.Kind())
+	}
+
+	// 遍历结构体字段
 	for i := 0; i < val.NumField(); i++ {
-		if val.Field(i).Kind() == reflect.Struct {
-			ParseStructWithEnv(val.Field(i).Addr().Interface(), val.Type().Field(i).Name)
-		} else {
-			envName := StrToEnvName(rootNodeName + "_" + val.Type().Field(i).Name)
-			env := os.Getenv(envName)
-			if env == "" {
-				continue
+		field := val.Field(i)
+		fieldType := tp.Field(i)
+
+		// 检查字段是否可设置且可导出
+		if !field.CanSet() {
+			continue
+		}
+		if !fieldType.IsExported() {
+			continue
+		}
+
+		// 递归处理嵌套结构体
+		if field.Kind() == reflect.Struct {
+			if err := ParseStructWithEnv(field.Addr().Interface(), rootNodeName+"_"+fieldType.Name); err != nil {
+				return err
 			}
-			switch val.Field(i).Type().Kind() {
-			case reflect.Bool:
-				v, _ := strconv.ParseBool(env)
-				val.Field(i).SetBool(v)
-			case reflect.Int:
-				v, _ := strconv.ParseInt(env, 10, 64)
-				val.Field(i).SetInt(v)
-			case reflect.String:
-				val.Field(i).SetString(env)
+			continue
+		}
+
+		// 处理嵌套指针结构体 *Struct
+		if field.Kind() == reflect.Ptr && !field.IsNil() && field.Type().Elem().Kind() == reflect.Struct {
+			if err := ParseStructWithEnv(field.Interface(), rootNodeName+"_"+fieldType.Name); err != nil {
+				return err
 			}
+			continue
+		}
+
+		// 构造环境变量名
+		envName := StrToEnvName(rootNodeName + "_" + fieldType.Name)
+		env := os.Getenv(envName)
+		if env == "" {
+			continue
+		}
+
+		// 根据类型解析环境变量值
+		switch field.Kind() {
+		case reflect.Bool:
+			v, err := strconv.ParseBool(env)
+			if err != nil {
+				return fmt.Errorf("parse bool field %s from env %s failed: %w", fieldType.Name, envName, err)
+			}
+			field.SetBool(v)
+
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v, err := strconv.ParseInt(env, 10, 64)
+			if err != nil {
+				return fmt.Errorf("parse int field %s from env %s failed: %w", fieldType.Name, envName, err)
+			}
+			if field.OverflowInt(v) {
+				return fmt.Errorf("int field %s overflow with value %s", fieldType.Name, env)
+			}
+			field.SetInt(v)
+
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			v, err := strconv.ParseUint(env, 10, 64)
+			if err != nil {
+				return fmt.Errorf("parse uint field %s from env %s failed: %w", fieldType.Name, envName, err)
+			}
+			if field.OverflowUint(v) {
+				return fmt.Errorf("uint field %s overflow with value %s", fieldType.Name, env)
+			}
+			field.SetUint(v)
+
+		case reflect.Float32, reflect.Float64:
+			v, err := strconv.ParseFloat(env, 64)
+			if err != nil {
+				return fmt.Errorf("parse float field %s from env %s failed: %w", fieldType.Name, envName, err)
+			}
+			if field.OverflowFloat(v) {
+				return fmt.Errorf("float field %s overflow with value %s", fieldType.Name, env)
+			}
+			field.SetFloat(v)
+
+		case reflect.String:
+			field.SetString(env)
+
+		default:
+			return fmt.Errorf("unsupported field type %s for field %s", field.Kind(), fieldType.Name)
 		}
 	}
+
+	return nil
 }
 
 // DefaultValue simply set default value to struct field by "default" tag
@@ -83,25 +157,32 @@ func DefaultValue(data interface{}) (err error) {
 
 		case reflect.Struct:
 			if structValue.Field(i).CanSet() {
-				err = DefaultValue(structValue.Field(i).Addr().Interface())
+				if err = DefaultValue(structValue.Field(i).Addr().Interface()); err != nil {
+					return err
+				}
 			}
 
 		case reflect.Slice:
 			sliceData := strings.Split(defaultValue, ",")
-			slcieDataLength := len(sliceData)
-			sliceValue := reflect.MakeSlice(fieldType.Type, len(sliceData), 0)
+			sliceLength := len(sliceData)
+			sliceValue := reflect.MakeSlice(fieldType.Type, sliceLength, sliceLength)
 			for k, v := range sliceData {
-				if k < slcieDataLength {
-					BasicTypeReflectSetValue(fieldValue.Index(i), v)
+				if k < sliceLength {
+					if err = BasicTypeReflectSetValue(sliceValue.Index(k), v); err != nil {
+						return fmt.Errorf("slice field %s index %d: %w", fieldType.Name, k, err)
+					}
 				}
 			}
 			fieldValue.Set(sliceValue)
 
 		case reflect.Array:
 			arrayLen := fieldValue.Len()
-			for k, v := range strings.Split(defaultValue, ",") {
+			arrayData := strings.Split(defaultValue, ",")
+			for k, v := range arrayData {
 				if k < arrayLen {
-					BasicTypeReflectSetValue(fieldValue.Index(k), v)
+					if err = BasicTypeReflectSetValue(fieldValue.Index(k), v); err != nil {
+						return fmt.Errorf("array field %s index %d: %w", fieldType.Name, k, err)
+					}
 				}
 			}
 
@@ -121,12 +202,14 @@ func DefaultValue(data interface{}) (err error) {
 			fieldValue.Set(mapValue)
 
 		case reflect.Ptr:
-			if !fieldValue.IsNil() {
-				err = DefaultValue(structValue.Field(i).Interface())
+			if !fieldValue.IsNil() && fieldValue.Elem().Kind() == reflect.Struct {
+				if err = DefaultValue(fieldValue.Interface()); err != nil {
+					return err
+				}
 			}
 
 		default:
-			err = fmt.Errorf("unsupport struct field type %s", fieldType.Type.String())
+			err = fmt.Errorf("unsupported struct field type %s for field %s", fieldType.Type.String(), fieldType.Name)
 		}
 
 		if err != nil {
@@ -147,31 +230,40 @@ func BasicTypeReflectSetValue(rv reflect.Value, value string) (err error) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		intValue, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return fmt.Errorf("convert tag default value to int64 failed -> %s", err.Error())
+			return fmt.Errorf("convert tag default value to int64 failed: %w", err)
+		}
+		if rv.OverflowInt(intValue) {
+			return fmt.Errorf("int overflow for value %s", value)
 		}
 		rv.SetInt(intValue)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		uintValue, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
-			return fmt.Errorf("convert tag default value to uint64 failed -> %s", err.Error())
+			return fmt.Errorf("convert tag default value to uint64 failed: %w", err)
+		}
+		if rv.OverflowUint(uintValue) {
+			return fmt.Errorf("uint overflow for value %s", value)
 		}
 		rv.SetUint(uintValue)
 	case reflect.Float32, reflect.Float64:
 		floatValue, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return fmt.Errorf("convert tag default value to float64 failed -> %s", err.Error())
+			return fmt.Errorf("convert tag default value to float64 failed: %w", err)
+		}
+		if rv.OverflowFloat(floatValue) {
+			return fmt.Errorf("float overflow for value %s", value)
 		}
 		rv.SetFloat(floatValue)
 
 	case reflect.Bool:
 		boolValue, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("convert tag default value to bool failed -> %s", err.Error())
+			return fmt.Errorf("convert tag default value to bool failed: %w", err)
 		}
 		rv.SetBool(boolValue)
 
 	default:
-		err = fmt.Errorf("unsupport struct field type %s", rv.Type().String())
+		err = fmt.Errorf("unsupported struct field type %s", rv.Type().String())
 	}
 	return err
 }

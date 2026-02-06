@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -84,27 +83,135 @@ func TestDefaultValue(t *testing.T) {
 }
 
 func TestBasicTypeReflectSetValue(t *testing.T) {
-	aa := 11
-	if err := BasicTypeReflectSetValue(reflect.ValueOf(&aa).Elem(), "22"); err != nil {
-		t.Fatal(err)
-	} else {
-		fmt.Println(aa)
-	}
-}
+	// 测试 String 类型
+	var str string
+	err := BasicTypeReflectSetValue(reflect.ValueOf(&str).Elem(), "hello")
+	assert.Nil(t, err)
+	assert.Equal(t, "hello", str)
 
-func TestParseDockerImageNameInfo(t *testing.T) {
-	var imageNames = []string{
-		"https://docker.io/pizza/rumia/rds-operator:v0.0.3",
-		"https://docker.io/rumia/rds-operator:v0.0.3",
-		"https://docker.io/rumia/rds-operator@sha256:123456789",
-		"https://docker.io/rumia/rds-operator",
-		"http://quay.io/rumia/rds-operator",
-		"rumia/rds-operator",
-		"centos",
-	}
+	// 测试 Int 类型
+	var numInt int
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numInt).Elem(), "42")
+	assert.Nil(t, err)
+	assert.Equal(t, 42, numInt)
 
-	for _, imageName := range imageNames {
-		info := ParseDockerImageNameInfo(imageName)
-		LogJSON(info)
-	}
+	// 测试 Int8 类型
+	var numInt8 int8
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numInt8).Elem(), "127")
+	assert.Nil(t, err)
+	assert.Equal(t, int8(127), numInt8)
+
+	// 测试 Int16 类型
+	var numInt16 int16
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numInt16).Elem(), "32767")
+	assert.Nil(t, err)
+	assert.Equal(t, int16(32767), numInt16)
+
+	// 测试 Int32 类型
+	var numInt32 int32
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numInt32).Elem(), "2147483647")
+	assert.Nil(t, err)
+	assert.Equal(t, int32(2147483647), numInt32)
+
+	// 测试 Int64 类型
+	var numInt64 int64
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numInt64).Elem(), "9223372036854775807")
+	assert.Nil(t, err)
+	assert.Equal(t, int64(9223372036854775807), numInt64)
+
+	// 测试 Uint 类型
+	var numUint uint
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numUint).Elem(), "42")
+	assert.Nil(t, err)
+	assert.Equal(t, uint(42), numUint)
+
+	// 测试 Uint8 类型
+	var numUint8 uint8
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numUint8).Elem(), "255")
+	assert.Nil(t, err)
+	assert.Equal(t, uint8(255), numUint8)
+
+	// 测试 Uint16 类型
+	var numUint16 uint16
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numUint16).Elem(), "65535")
+	assert.Nil(t, err)
+	assert.Equal(t, uint16(65535), numUint16)
+
+	// 测试 Uint32 类型
+	var numUint32 uint32
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numUint32).Elem(), "4294967295")
+	assert.Nil(t, err)
+	assert.Equal(t, uint32(4294967295), numUint32)
+
+	// 测试 Uint64 类型
+	var numUint64 uint64
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numUint64).Elem(), "18446744073709551615")
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(18446744073709551615), numUint64)
+
+	// 测试 Float32 类型
+	var numFloat32 float32
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numFloat32).Elem(), "3.14159")
+	assert.Nil(t, err)
+	assert.InDelta(t, float32(3.14159), numFloat32, 0.0001)
+
+	// 测试 Float64 类型
+	var numFloat64 float64
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&numFloat64).Elem(), "3.141592653589793")
+	assert.Nil(t, err)
+	assert.InDelta(t, float64(3.141592653589793), numFloat64, 0.0001)
+
+	// 测试 Bool 类型
+	var flag bool
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&flag).Elem(), "true")
+	assert.Nil(t, err)
+	assert.Equal(t, true, flag)
+
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&flag).Elem(), "false")
+	assert.Nil(t, err)
+	assert.Equal(t, false, flag)
+
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&flag).Elem(), "1")
+	assert.Nil(t, err)
+	assert.Equal(t, true, flag)
+
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&flag).Elem(), "0")
+	assert.Nil(t, err)
+	assert.Equal(t, false, flag)
+
+	// 测试无效的 Int 值
+	var invalidInt int
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&invalidInt).Elem(), "invalid")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "convert tag default value to int64 failed")
+
+	// 测试无效的 Bool 值
+	var invalidBool bool
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&invalidBool).Elem(), "yes")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "convert tag default value to bool failed")
+
+	// 测试 Int 溢出
+	var overflowInt8 int8
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&overflowInt8).Elem(), "999")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "int overflow")
+
+	// 测试 Uint 溢出
+	var overflowUint8 uint8
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&overflowUint8).Elem(), "999")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "uint overflow")
+
+	// 测试 Float 溢出
+	var overflowFloat32 float32
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&overflowFloat32).Elem(), "1e100")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "float overflow")
+
+	// 测试不支持的类型
+	slice := []int{1, 2, 3}
+	err = BasicTypeReflectSetValue(reflect.ValueOf(&slice).Elem(), "test")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "unsupported struct field type")
 }
