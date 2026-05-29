@@ -10,6 +10,9 @@ type TrieTreeNode struct {
 	Data     byte
 	Children []*TrieTreeNode
 	RefCount int
+	IsEnd    bool           // 是否为单词终点（违禁词检查使用）
+	Fail     *TrieTreeNode  // AC 自动机失败链接（违禁词检查使用）
+	Depth    int            // 节点深度，根节点为 0（违禁词检查使用）
 }
 
 func (t *TrieTreeNode) String() string {
