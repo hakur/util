@@ -190,8 +190,8 @@ func TestBadWordsCheckerACAutomaton(t *testing.T) {
 	assert.True(t, c.Contains("she said"))
 	assert.True(t, c.Contains("this is his book"))
 	assert.True(t, c.Contains("hers"))
-	assert.False(t, c.Contains("the"))   // "he" 在 "the" 内部
-	assert.False(t, c.Contains("ushe"))  // "she"/"he" 在 "ushe" 内部
+	assert.False(t, c.Contains("the"))  // "he" 在 "the" 内部
+	assert.False(t, c.Contains("ushe")) // "she"/"he" 在 "ushe" 内部
 
 	// 中文：AC 失败链接链正常工作
 	c2 := NewBadWordsChecker()
