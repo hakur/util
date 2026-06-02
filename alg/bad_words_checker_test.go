@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 3.1 中文违禁词测试
+// 3.1 中文违禁词测试（回归：应保持子串匹配）
 func TestBadWordsCheckerChineseContains(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.Add("敏感词")
@@ -37,12 +37,11 @@ func TestBadWordsCheckerChineseReplace(t *testing.T) {
 	result := c.Replace("这段文本包含敏感词需要屏蔽", '*')
 	assert.Equal(t, "这段文本包含***需要屏蔽", result)
 
-	// 无违禁词时返回原文本
 	result = c.Replace("正常文本", '*')
 	assert.Equal(t, "正常文本", result)
 }
 
-// 3.2 英文违禁词测试 + 子串匹配
+// 3.2 英文违禁词测试（词边界匹配）
 func TestBadWordsCheckerEnglishContains(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.AddWords([]string{"bad", "evil", "danger"})
@@ -70,45 +69,95 @@ func TestBadWordsCheckerEnglishReplace(t *testing.T) {
 	assert.Equal(t, "*** **** here", result)
 }
 
+// 英文词边界测试
+func TestBadWordsCheckerWordBoundary(t *testing.T) {
+	c := NewBadWordsChecker()
+	c.Add("sm")
+
+	// 词边界命中
+	assert.True(t, c.Contains("sm test"))
+	assert.True(t, c.Contains("test sm"))
+	assert.True(t, c.Contains(".sm!"))
+	assert.True(t, c.Contains("sm"))
+
+	// 单词内部不命中
+	assert.False(t, c.Contains("smile"))
+	assert.False(t, c.Contains("small"))
+	assert.False(t, c.Contains("passme"))
+
+	// FindAll 词边界
+	matches := c.FindAll("sm test sm")
+	assert.Len(t, matches, 2)
+}
+
+func TestBadWordsCheckerWordBoundaryEdges(t *testing.T) {
+	c := NewBadWordsChecker()
+	c.Add("bad")
+
+	// 首部边界
+	assert.True(t, c.Contains("bad apple"))
+	// 尾部边界
+	assert.True(t, c.Contains("very bad"))
+	// 标点边界
+	assert.True(t, c.Contains("(bad)"))
+	// 单词内部
+	assert.False(t, c.Contains("badger"))
+	assert.False(t, c.Contains("embad"))
+}
+
+// 中文子串回归：不应受英文词边界影响
+func TestBadWordsCheckerChineseSubstringRegression(t *testing.T) {
+	c := NewBadWordsChecker()
+	c.Add("敏感词")
+
+	// 中文在文本中任意位置都应命中
+	assert.True(t, c.Contains("这是敏感词文本"))
+	assert.True(t, c.Contains("前缀敏感词"))
+	assert.True(t, c.Contains("敏感词后缀"))
+}
+
+// 更新：全 ASCII 违禁词不再命中单词内部
 func TestBadWordsCheckerSubstringMatch(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.Add("ab")
 
-	// "ab" 在 "abc" 中应命中
-	assert.True(t, c.Contains("abc"))
-	assert.True(t, c.Contains("xaby"))
-	assert.False(t, c.Contains("ac"))
+	// "ab" 在 "abc" 中 → ASCII 词边界检查失败（后面是 'c'）
+	assert.False(t, c.Contains("abc"))
+	assert.False(t, c.Contains("xaby"))
 
-	// FindAll 确认匹配位置
-	matches := c.FindAll("abc")
-	assert.Len(t, matches, 1)
-	assert.Equal(t, "ab", matches[0].Word)
-	assert.Equal(t, 0, matches[0].ByteStart)
-	assert.Equal(t, 2, matches[0].ByteEnd)
+	// 词边界处命中
+	assert.True(t, c.Contains("ab cd"))
+	assert.True(t, c.Contains("ab"))
 }
 
+// 更新：重叠 ASCII 违禁词在无边界时不命中
 func TestBadWordsCheckerMultipleSubstrings(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.AddWords([]string{"ab", "bc"})
 
+	// "abc" 中无词边界，两个都不命中
 	matches := c.FindAll("abc")
+	assert.Len(t, matches, 0)
+
+	// 有边界时各自命中
+	matches = c.FindAll("ab bc")
 	assert.Len(t, matches, 2)
 }
 
 // 3.3 边界测试
 func TestBadWordsCheckerEmptyWord(t *testing.T) {
 	c := NewBadWordsChecker()
-	c.Add("") // 空字符串应被忽略
+	c.Add("")
 	c.Add("abc")
 
-	assert.True(t, c.Contains("abc"))
-	assert.False(t, c.Contains("")) // 空文本
+	assert.True(t, c.Contains("abc is here"))
+	assert.False(t, c.Contains(""))
 }
 
 func TestBadWordsCheckerDuplicateAdd(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.Add("abc")
-	c.Add("abc") // 重复添加，幂等
+	c.Add("abc")
 	c.Add("abc")
 
 	matches := c.FindAll("abc abc abc")
@@ -127,34 +176,35 @@ func TestBadWordsCheckerOverlappingReplace(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.AddWords([]string{"ab", "bc"})
 
-	// 重叠匹配应合并后替换
-	result := c.Replace("abc", '*')
-	assert.Equal(t, "***", result)
+	// "ab bc" 有空格边界
+	result := c.Replace("ab bc", '*')
+	assert.Equal(t, "** **", result)
 }
 
 func TestBadWordsCheckerACAutomaton(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.AddWords([]string{"he", "she", "his", "hers"})
 
-	// "ushe" 应同时匹配 "she" 和 "he"（通过失败链接链）
-	matches := c.FindAll("ushe")
-	assert.Len(t, matches, 2)
-
-	// Contains 也应该检测到
-	assert.True(t, c.Contains("ushe"))
+	// 英文：词边界检查防止误报
+	assert.True(t, c.Contains("he said"))
+	assert.True(t, c.Contains("she said"))
 	assert.True(t, c.Contains("this is his book"))
 	assert.True(t, c.Contains("hers"))
-	assert.False(t, c.Contains("nothing wrong"))
+	assert.False(t, c.Contains("the"))   // "he" 在 "the" 内部
+	assert.False(t, c.Contains("ushe"))  // "she"/"he" 在 "ushe" 内部
+
+	// 中文：AC 失败链接链正常工作
+	c2 := NewBadWordsChecker()
+	c2.AddWords([]string{"敏感词", "感词"})
+	matches := c2.FindAll("这是敏感词文本")
+	assert.Len(t, matches, 2)
 }
 
 func TestBadWordsCheckerBuildOnlyWhenDirty(t *testing.T) {
 	c := NewBadWordsChecker()
 	c.Add("test")
 
-	// 首次 Contains 触发 Build
 	assert.True(t, c.Contains("test sentence"))
-
-	// 连续调用不重复 Build
 	assert.True(t, c.Contains("another test"))
 	assert.False(t, c.Contains("clean text"))
 }
@@ -166,7 +216,6 @@ func TestBadWordsCheckerConcurrentReadWrite(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	// 并发读
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
@@ -179,7 +228,6 @@ func TestBadWordsCheckerConcurrentReadWrite(t *testing.T) {
 		}()
 	}
 
-	// 并发写
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -203,11 +251,50 @@ func TestBadWordsCheckerConcurrentBuild(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// 并发触发首次检查，应只有一个执行 Build
-			assert.True(t, c.Contains("test"))
+			assert.True(t, c.Contains("a test case"))
 		}()
 	}
 	wg.Wait()
+}
+
+// NormalizeCJK 测试
+func TestNormalizeCJKRemoveSpaces(t *testing.T) {
+	normalized, index := NormalizeCJK("违 禁 词")
+	assert.Equal(t, "违禁词", normalized)
+	assert.Equal(t, []int{0, 2, 4}, index)
+}
+
+func TestNormalizeCJKConsecutiveSpaces(t *testing.T) {
+	normalized, index := NormalizeCJK("违   禁  词")
+	assert.Equal(t, "违禁词", normalized)
+	assert.Equal(t, []int{0, 4, 7}, index)
+}
+
+func TestNormalizeCJKPreserveASCIISpaces(t *testing.T) {
+	normalized, index := NormalizeCJK("hello world")
+	assert.Equal(t, "hello world", normalized)
+	expected := make([]int, 11)
+	for i := range expected {
+		expected[i] = i
+	}
+	assert.Equal(t, expected, index)
+}
+
+func TestNormalizeCJKMixedText(t *testing.T) {
+	normalized, _ := NormalizeCJK("hello 世 界")
+	assert.Equal(t, "hello 世界", normalized)
+}
+
+func TestNormalizeCJKNoChange(t *testing.T) {
+	normalized, index := NormalizeCJK("正常文本")
+	assert.Equal(t, "正常文本", normalized)
+	assert.Equal(t, []int{0, 1, 2, 3}, index)
+}
+
+func TestNormalizeCJKEmpty(t *testing.T) {
+	normalized, index := NormalizeCJK("")
+	assert.Equal(t, "", normalized)
+	assert.Empty(t, index)
 }
 
 // 3.5 基准测试
