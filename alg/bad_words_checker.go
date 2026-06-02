@@ -17,16 +17,18 @@ type BadWordMatch struct {
 // BadWordsChecker bad words checker based on Aho-Corasick automaton, O(n) time complexity multi-pattern matching
 // BadWordsChecker 基于 AC 自动机的违禁词检查器，O(n) 时间复杂度多模式匹配
 type BadWordsChecker struct {
-	root  *TrieTreeNode
-	lock  sync.RWMutex
-	dirty bool // 标记是否需要重建 AC 失败链接
+	root       *TrieTreeNode
+	lock       sync.RWMutex
+	dirty      bool // 标记是否需要重建 AC 失败链接
+	normalizer *BadWordsNormalizer
 }
 
 // NewBadWordsChecker create new bad words checker instance
 // NewBadWordsChecker 创建违禁词检查器实例
 func NewBadWordsChecker() *BadWordsChecker {
 	return &BadWordsChecker{
-		root: &TrieTreeNode{},
+		root:       &TrieTreeNode{},
+		normalizer: &BadWordsNormalizer{},
 	}
 }
 
@@ -262,13 +264,13 @@ func (c *BadWordsChecker) scan(text string, onMatch func(byteEnd int, node *Trie
 // isWordBoundary 检查匹配位置是否在词边界，ASCII 词前后不能是 ASCII 字母
 func (c *BadWordsChecker) isWordBoundary(text string, byteStart, byteEnd int) bool {
 	word := text[byteStart:byteEnd]
-	if !isASCIIWord(word) {
+	if !c.normalizer.isASCIIWord(word) {
 		return true // 非 ASCII 违禁词保持子串匹配
 	}
-	if byteStart > 0 && isASCIILetter(text[byteStart-1]) {
+	if byteStart > 0 && c.normalizer.isASCIILetter(text[byteStart-1]) {
 		return false
 	}
-	if byteEnd < len(text) && isASCIILetter(text[byteEnd]) {
+	if byteEnd < len(text) && c.normalizer.isASCIILetter(text[byteEnd]) {
 		return false
 	}
 	return true
@@ -339,15 +341,25 @@ func (c *BadWordsChecker) mergeByteRanges(matches []BadWordMatch) []BadWordMatch
 	return merged
 }
 
+// NormalizeCJK remove ASCII spaces between CJK characters, delegation to BadWordsNormalizer
+// NormalizeCJK 删除 CJK 字符之间的 ASCII 空格（委托给 BadWordsNormalizer）
+func NormalizeCJK(text string) (normalized string, runeIndex []int) {
+	return (&BadWordsNormalizer{}).NormalizeCJK(text)
+}
+
+// BadWordsNormalizer CJK/ASCII character judgment and text normalization utilities
+// BadWordsNormalizer CJK/ASCII 字符判断与文本归一化工具
+type BadWordsNormalizer struct{}
+
 // isASCIILetter check if byte is an ASCII letter [a-zA-Z]
 // isASCIILetter 检查字节是否为 ASCII 字母
-func isASCIILetter(b byte) bool {
+func (n *BadWordsNormalizer) isASCIILetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
 // isASCIIWord check if string is composed entirely of ASCII bytes
 // isASCIIWord 检查字符串是否全为 ASCII 字节
-func isASCIIWord(s string) bool {
+func (n *BadWordsNormalizer) isASCIIWord(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 128 {
 			return false
@@ -358,7 +370,7 @@ func isASCIIWord(s string) bool {
 
 // isCJK check if rune is in CJK Unified Ideographs range
 // isCJK 检查 rune 是否为 CJK 统一表意文字
-func isCJK(r rune) bool {
+func (n *BadWordsNormalizer) isCJK(r rune) bool {
 	return (r >= 0x4E00 && r <= 0x9FFF) ||
 		(r >= 0x3400 && r <= 0x4DBF) ||
 		(r >= 0x20000 && r <= 0x2A6DF)
@@ -367,11 +379,10 @@ func isCJK(r rune) bool {
 // NormalizeCJK remove ASCII spaces between CJK characters to defeat space-based evasion
 // NormalizeCJK 删除 CJK 字符之间的 ASCII 空格（用于反空格规避）
 // 返回归一化文本和从归一化 rune 位置到原文 rune 位置的映射表
-func NormalizeCJK(text string) (normalized string, runeIndex []int) {
+func (n *BadWordsNormalizer) NormalizeCJK(text string) (normalized string, runeIndex []int) {
 	runes := []rune(text)
 
-	// 检查是否需要归一化
-	if !hasCJKBoundSpace(runes) {
+	if !n.hasCJKBoundSpace(runes) {
 		runeIndex = make([]int, len(runes))
 		for i := range runes {
 			runeIndex[i] = i
@@ -379,12 +390,11 @@ func NormalizeCJK(text string) (normalized string, runeIndex []int) {
 		return text, runeIndex
 	}
 
-	// 构建归一化结果：跳过 CJK 字符之间的空格
 	buf := make([]rune, 0, len(runes))
 	runeIndex = make([]int, 0, len(runes))
 
 	for i := 0; i < len(runes); i++ {
-		if runes[i] == ' ' && isCJKBoundSpace(runes, i) {
+		if runes[i] == ' ' && n.isCJKBoundSpace(runes, i) {
 			continue
 		}
 		buf = append(buf, runes[i])
@@ -396,9 +406,9 @@ func NormalizeCJK(text string) (normalized string, runeIndex []int) {
 
 // hasCJKBoundSpace returns true if any space in runes is between CJK characters
 // hasCJKBoundSpace 检查是否存在被 CJK 字符包围的空格
-func hasCJKBoundSpace(runes []rune) bool {
+func (n *BadWordsNormalizer) hasCJKBoundSpace(runes []rune) bool {
 	for i := 0; i < len(runes); i++ {
-		if runes[i] == ' ' && isCJKBoundSpace(runes, i) {
+		if runes[i] == ' ' && n.isCJKBoundSpace(runes, i) {
 			return true
 		}
 	}
@@ -407,7 +417,7 @@ func hasCJKBoundSpace(runes []rune) bool {
 
 // isCJKBoundSpace returns true if runes[i] is a space bounded by CJK characters on both sides
 // isCJKBoundSpace 检查位置 i 的空格是否前后有 CJK 字符包围（跳过连续空格）
-func isCJKBoundSpace(runes []rune, i int) bool {
+func (n *BadWordsNormalizer) isCJKBoundSpace(runes []rune, i int) bool {
 	if i <= 0 || i >= len(runes)-1 || runes[i] != ' ' {
 		return false
 	}
@@ -415,7 +425,7 @@ func isCJKBoundSpace(runes []rune, i int) bool {
 	hasCJKBefore := false
 	for j := i - 1; j >= 0; j-- {
 		if runes[j] != ' ' {
-			hasCJKBefore = isCJK(runes[j])
+			hasCJKBefore = n.isCJK(runes[j])
 			break
 		}
 	}
@@ -425,7 +435,7 @@ func isCJKBoundSpace(runes []rune, i int) bool {
 	// 向后查找最近的非空格字符
 	for j := i + 1; j < len(runes); j++ {
 		if runes[j] != ' ' {
-			return isCJK(runes[j])
+			return n.isCJK(runes[j])
 		}
 	}
 	return false
