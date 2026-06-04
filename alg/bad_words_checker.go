@@ -6,6 +6,29 @@ import (
 	"unicode/utf8"
 )
 
+// BadWordsTextNormalizer defines text preprocessing strategy for matching.
+//
+// Designed as an interface to support future normalization strategies
+// (case folding, full-width to half-width, Unicode NFKD, etc.). Only one
+// implementation exists today (BadWordsCjkNormalizer). The interface exists as a
+// strategic extension point: it separates policy (BadWordsChecker's
+// matching logic) from mechanism (how text is normalized), allowing
+// deployments to swap normalizers without modifying checker internals.
+//
+// BadWordsTextNormalizer 定义匹配前的文本预处理策略。
+// 设计为接口以支持未来替换归一化策略。虽然当前仅有一种实现，但接口将
+// 匹配策略与归一化机制解耦，允许部署时替换而无需修改检查器内部。
+type BadWordsTextNormalizer interface {
+	// Normalize preprocesses raw text for matching.
+	// normalized is the transformed text; runeMapping[i] is the rune
+	// position in rawText that corresponds to normalized rune at index i.
+	//
+	// Normalize 预处理原始文本。
+	// normalized 是变换后的文本；runeMapping[i] 是归一化后第 i 个 rune
+	// 在 rawText 中对应的原始 rune 位置。
+	Normalize(rawText string) (normalized string, runeMapping []int)
+}
+
 // BadWordMatch banned word match result with position info
 // BadWordMatch 违禁词匹配结果
 type BadWordMatch struct {
@@ -14,21 +37,58 @@ type BadWordMatch struct {
 	ByteEnd   int    // 在原文中的字节结束位置（不包含）
 }
 
+// BadWordsCheckerOpts configures a BadWordsChecker.
+// BadWordsCheckerOpts 检查器配置
+type BadWordsCheckerOpts struct {
+	// Normalizers is an ordered chain of text normalizers applied before matching.
+	// Normalizers 归一化器链，按序应用于匹配前的文本。
+	Normalizers []BadWordsTextNormalizer
+}
+
 // BadWordsChecker bad words checker based on Aho-Corasick automaton, O(n) time complexity multi-pattern matching
 // BadWordsChecker 基于 AC 自动机的违禁词检查器，O(n) 时间复杂度多模式匹配
 type BadWordsChecker struct {
-	root       *TrieTreeNode
-	lock       sync.RWMutex
-	dirty      bool // 标记是否需要重建 AC 失败链接
-	normalizer *BadWordsNormalizer
+	root        *TrieTreeNode
+	lock        sync.RWMutex
+	dirty       bool // 标记是否需要重建 AC 失败链接
+	normalizers []BadWordsTextNormalizer
 }
 
-// NewBadWordsChecker create new bad words checker instance
-// NewBadWordsChecker 创建违禁词检查器实例
-func NewBadWordsChecker() *BadWordsChecker {
-	return &BadWordsChecker{
-		root:       &TrieTreeNode{},
-		normalizer: &BadWordsNormalizer{},
+// NewBadWordsChecker create a bad words checker.
+// When opts is nil or Normalizers is empty, defaults to BadWordsCjkNormalizer.
+//
+// NewBadWordsChecker 创建违禁词检查器。
+// opts 为 nil 或 Normalizers 为空时，默认使用 BadWordsCjkNormalizer。
+func NewBadWordsChecker(opts *BadWordsCheckerOpts) *BadWordsChecker {
+	c := &BadWordsChecker{
+		root: &TrieTreeNode{},
+	}
+	if opts != nil && opts.Normalizers != nil {
+		c.normalizers = opts.Normalizers
+	} else {
+		c.normalizers = []BadWordsTextNormalizer{&BadWordsCjkNormalizer{}}
+	}
+	return c
+}
+
+// AddNormalizer appends a normalizer to the chain.
+// AddNormalizer 向归一化链追加一个归一化器。
+func (c *BadWordsChecker) AddNormalizer(normalizer BadWordsTextNormalizer) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.normalizers = append(c.normalizers, normalizer)
+}
+
+// RemoveNormalizer removes a normalizer from the chain.
+// RemoveNormalizer 从归一化链中移除一个归一化器。
+func (c *BadWordsChecker) RemoveNormalizer(normalizer BadWordsTextNormalizer) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for i, n := range c.normalizers {
+		if n == normalizer {
+			c.normalizers = append(c.normalizers[:i], c.normalizers[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -53,17 +113,6 @@ func (c *BadWordsChecker) AddWords(words []string) {
 			c.addLocked(word)
 		}
 	}
-}
-
-// addLocked insert a word into trie tree, caller must hold write lock
-// addLocked 将违禁词插入字典树，调用方需持有写锁
-func (c *BadWordsChecker) addLocked(word string) {
-	node := c.root
-	for _, b := range []byte(word) {
-		node = c.getOrCreateChild(node, b)
-	}
-	node.IsEnd = true
-	c.dirty = true
 }
 
 // Build manually build AC automaton failure links, can be triggered automatically after Add
@@ -94,8 +143,8 @@ func (c *BadWordsChecker) Contains(text string) bool {
 
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.scan(text, func(byteEnd int, node *TrieTreeNode) bool {
-		return true // 首次匹配即停止
+	return c.scan(c.normalizeText(text), func(byteEnd int, node *TrieTreeNode) bool {
+		return true
 	})
 }
 
@@ -117,16 +166,17 @@ func (c *BadWordsChecker) FindAll(text string) []BadWordMatch {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	normalizedText := c.normalizeText(text)
 	var matches []BadWordMatch
-	c.scan(text, func(byteEnd int, node *TrieTreeNode) bool {
+	c.scan(normalizedText, func(byteEnd int, node *TrieTreeNode) bool {
 		byteStart := byteEnd - node.Depth
-		word := text[byteStart:byteEnd]
+		word := normalizedText[byteStart:byteEnd]
 		matches = append(matches, BadWordMatch{
 			Word:      word,
 			ByteStart: byteStart,
 			ByteEnd:   byteEnd,
 		})
-		return false // 收集所有匹配
+		return false
 	})
 	return matches
 }
@@ -134,30 +184,28 @@ func (c *BadWordsChecker) FindAll(text string) []BadWordMatch {
 // Replace replace all banned words in text with mask character at rune level, overlapping matches are merged before replace
 // Replace 将文本中违禁词替换为 mask 字符（rune 级别），重叠匹配会先合并
 func (c *BadWordsChecker) Replace(text string, mask rune) string {
+	normalizedText := c.normalizeText(text)
 	matches := c.FindAll(text)
 	if len(matches) == 0 {
 		return text
 	}
 
-	// 合并重叠的匹配区间（贪心合并）
 	merged := c.mergeByteRanges(matches)
 	if len(merged) == 0 {
 		return text
 	}
 
-	// 构建字节到 rune 位置的映射表
-	runes := []rune(text)
-	byteToRuneIndex := make([]int, len(text)+1)
+	runes := []rune(normalizedText)
+	byteToRuneIndex := make([]int, len(normalizedText)+1)
 	ri := 0
-	for bi := 0; bi < len(text); {
+	for bi := 0; bi < len(normalizedText); {
 		byteToRuneIndex[bi] = ri
-		_, size := utf8.DecodeRuneInString(text[bi:])
+		_, size := utf8.DecodeRuneInString(normalizedText[bi:])
 		bi += size
 		ri++
 	}
-	byteToRuneIndex[len(text)] = ri
+	byteToRuneIndex[len(normalizedText)] = ri
 
-	// 在 rune 级别执行替换
 	for _, m := range merged {
 		rStart := byteToRuneIndex[m.ByteStart]
 		rEnd := byteToRuneIndex[m.ByteEnd]
@@ -169,8 +217,17 @@ func (c *BadWordsChecker) Replace(text string, mask rune) string {
 	return string(runes)
 }
 
-// ensureBuilt ensure AC automaton is built, using double-checked locking
-// ensureBuilt 确保 AC 自动机已构建，使用双重检查锁模式
+// ─── 内部方法 ───────────────────────────────────────────────────────────
+
+func (c *BadWordsChecker) addLocked(word string) {
+	node := c.root
+	for _, b := range []byte(word) {
+		node = c.getOrCreateChild(node, b)
+	}
+	node.IsEnd = true
+	c.dirty = true
+}
+
 func (c *BadWordsChecker) ensureBuilt() {
 	c.lock.RLock()
 	if !c.dirty {
@@ -187,13 +244,9 @@ func (c *BadWordsChecker) ensureBuilt() {
 	c.build()
 }
 
-// build BFS construction of AC automaton failure links, caller must hold write lock
-// build BFS 构建 AC 自动机失败链接，调用方需持有写锁
 func (c *BadWordsChecker) build() {
-	// 确保根节点的基础状态
 	c.root.Fail = nil
 
-	// BFS 队列，从第 1 层开始
 	queue := make([]*TrieTreeNode, 0, len(c.root.Children))
 	for _, child := range c.root.Children {
 		child.Fail = c.root
@@ -205,7 +258,6 @@ func (c *BadWordsChecker) build() {
 		queue = queue[1:]
 
 		for _, child := range node.Children {
-			// 沿父节点的失败链接查找匹配
 			failNode := node.Fail
 			for failNode != c.root && c.findChild(failNode, child.Data) == nil {
 				failNode = failNode.Fail
@@ -222,15 +274,12 @@ func (c *BadWordsChecker) build() {
 	c.dirty = false
 }
 
-// scan AC automaton text scan, onMatch called for each matched word, return true to stop early
-// scan AC 自动机扫描文本，onMatch 每匹配一个违禁词调用一次，返回 true 表示提前终止
 func (c *BadWordsChecker) scan(text string, onMatch func(byteEnd int, node *TrieTreeNode) bool) bool {
 	node := c.root
 
 	for i := 0; i < len(text); i++ {
 		b := text[i]
 
-		// 回溯失败链接直到匹配或回到根节点
 		for node != c.root && c.findChild(node, b) == nil {
 			node = node.Fail
 		}
@@ -239,13 +288,11 @@ func (c *BadWordsChecker) scan(text string, onMatch func(byteEnd int, node *Trie
 			node = child
 		}
 
-		// 检查当前节点及其失败链接链上的所有匹配
 		for temp := node; temp != c.root; temp = temp.Fail {
 			if temp.IsEnd {
 				byteEnd := i + 1
 				byteStart := byteEnd - temp.Depth
 
-				// ASCII-only 违禁词需通过词边界检查
 				if !c.isWordBoundary(text, byteStart, byteEnd) {
 					continue
 				}
@@ -260,24 +307,27 @@ func (c *BadWordsChecker) scan(text string, onMatch func(byteEnd int, node *Trie
 	return false
 }
 
-// isWordBoundary check if the match at [byteStart, byteEnd) in text is at a word boundary
-// isWordBoundary 检查匹配位置是否在词边界，ASCII 词前后不能是 ASCII 字母
+// isWordBoundary checks if the match position is at a word boundary.
+// ASCII-only words cannot have ASCII letters immediately before or after.
+// Non-ASCII words (e.g. CJK) always pass (substring matching).
+//
+// isWordBoundary 检查匹配位置是否在词边界。
+// 全 ASCII 违禁词前后不能是 ASCII 字母；非 ASCII 违禁词始终通过（子串匹配）。
 func (c *BadWordsChecker) isWordBoundary(text string, byteStart, byteEnd int) bool {
-	word := text[byteStart:byteEnd]
-	if !c.normalizer.isASCIIWord(word) {
-		return true // 非 ASCII 违禁词保持子串匹配
+	for i := byteStart; i < byteEnd; i++ {
+		if text[i] >= 128 {
+			return true // 非 ASCII → 子串匹配
+		}
 	}
-	if byteStart > 0 && c.normalizer.isASCIILetter(text[byteStart-1]) {
+	if byteStart > 0 && ((text[byteStart-1] >= 'a' && text[byteStart-1] <= 'z') || (text[byteStart-1] >= 'A' && text[byteStart-1] <= 'Z')) {
 		return false
 	}
-	if byteEnd < len(text) && c.normalizer.isASCIILetter(text[byteEnd]) {
+	if byteEnd < len(text) && ((text[byteEnd] >= 'a' && text[byteEnd] <= 'z') || (text[byteEnd] >= 'A' && text[byteEnd] <= 'Z')) {
 		return false
 	}
 	return true
 }
 
-// findChild binary search child node by data byte in sorted children slice
-// findChild 在有序子节点切片中二分查找指定字节的子节点
 func (c *BadWordsChecker) findChild(node *TrieTreeNode, data byte) *TrieTreeNode {
 	if len(node.Children) == 0 {
 		return nil
@@ -291,8 +341,6 @@ func (c *BadWordsChecker) findChild(node *TrieTreeNode, data byte) *TrieTreeNode
 	return nil
 }
 
-// getOrCreateChild find or create child node, new node's Fail defaults to root
-// getOrCreateChild 查找或创建子节点，新节点的 Fail 默认为 root
 func (c *BadWordsChecker) getOrCreateChild(node *TrieTreeNode, data byte) *TrieTreeNode {
 	childCount := len(node.Children)
 	if childCount > 0 {
@@ -303,7 +351,6 @@ func (c *BadWordsChecker) getOrCreateChild(node *TrieTreeNode, data byte) *TrieT
 			return node.Children[idx]
 		}
 	}
-	// 创建新节点
 	newNode := &TrieTreeNode{
 		Data:  data,
 		Fail:  c.root,
@@ -316,8 +363,6 @@ func (c *BadWordsChecker) getOrCreateChild(node *TrieTreeNode, data byte) *TrieT
 	return newNode
 }
 
-// mergeByteRanges merge overlapping byte ranges by sorting and greedy merging
-// mergeByteRanges 排序后贪心合并重叠的字节区间
 func (c *BadWordsChecker) mergeByteRanges(matches []BadWordMatch) []BadWordMatch {
 	if len(matches) <= 1 {
 		return matches
@@ -341,72 +386,54 @@ func (c *BadWordsChecker) mergeByteRanges(matches []BadWordMatch) []BadWordMatch
 	return merged
 }
 
-// NormalizeCJK remove ASCII spaces between CJK characters, delegation to BadWordsNormalizer
-// NormalizeCJK 删除 CJK 字符之间的 ASCII 空格（委托给 BadWordsNormalizer）
-func NormalizeCJK(text string) (normalized string, runeIndex []int) {
-	return (&BadWordsNormalizer{}).NormalizeCJK(text)
-}
-
-// BadWordsNormalizer CJK/ASCII character judgment and text normalization utilities
-// BadWordsNormalizer CJK/ASCII 字符判断与文本归一化工具
-type BadWordsNormalizer struct{}
-
-// isASCIILetter check if byte is an ASCII letter [a-zA-Z]
-// isASCIILetter 检查字节是否为 ASCII 字母
-func (n *BadWordsNormalizer) isASCIILetter(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
-}
-
-// isASCIIWord check if string is composed entirely of ASCII bytes
-// isASCIIWord 检查字符串是否全为 ASCII 字节
-func (n *BadWordsNormalizer) isASCIIWord(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] >= 128 {
-			return false
-		}
+func (c *BadWordsChecker) normalizeText(rawText string) string {
+	text := rawText
+	for _, n := range c.normalizers {
+		text, _ = n.Normalize(text)
 	}
-	return true
+	return text
 }
 
-// isCJK check if rune is in CJK Unified Ideographs range
-// isCJK 检查 rune 是否为 CJK 统一表意文字
-func (n *BadWordsNormalizer) isCJK(r rune) bool {
-	return (r >= 0x4E00 && r <= 0x9FFF) ||
-		(r >= 0x3400 && r <= 0x4DBF) ||
-		(r >= 0x20000 && r <= 0x2A6DF)
-}
+// ─── BadWordsCjkNormalizer ─────────────────────────────────────────────────────────
 
-// NormalizeCJK remove ASCII spaces between CJK characters to defeat space-based evasion
-// NormalizeCJK 删除 CJK 字符之间的 ASCII 空格（用于反空格规避）
-// 返回归一化文本和从归一化 rune 位置到原文 rune 位置的映射表
-func (n *BadWordsNormalizer) NormalizeCJK(text string) (normalized string, runeIndex []int) {
-	runes := []rune(text)
+// BadWordsCjkNormalizer removes ASCII spaces between CJK characters.
+// BadWordsCjkNormalizer 删除 CJK 字符间的 ASCII 空格。
+type BadWordsCjkNormalizer struct{}
+
+// Normalize removes ASCII spaces between CJK characters.
+// Normalize 删除 CJK 字符之间的 ASCII 空格。
+func (n *BadWordsCjkNormalizer) Normalize(rawText string) (normalized string, runeMapping []int) {
+	runes := []rune(rawText)
 
 	if !n.hasCJKBoundSpace(runes) {
-		runeIndex = make([]int, len(runes))
+		runeMapping = make([]int, len(runes))
 		for i := range runes {
-			runeIndex[i] = i
+			runeMapping[i] = i
 		}
-		return text, runeIndex
+		return rawText, runeMapping
 	}
 
 	buf := make([]rune, 0, len(runes))
-	runeIndex = make([]int, 0, len(runes))
+	runeMapping = make([]int, 0, len(runes))
 
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == ' ' && n.isCJKBoundSpace(runes, i) {
 			continue
 		}
 		buf = append(buf, runes[i])
-		runeIndex = append(runeIndex, i)
+		runeMapping = append(runeMapping, i)
 	}
 
-	return string(buf), runeIndex
+	return string(buf), runeMapping
 }
 
-// hasCJKBoundSpace returns true if any space in runes is between CJK characters
-// hasCJKBoundSpace 检查是否存在被 CJK 字符包围的空格
-func (n *BadWordsNormalizer) hasCJKBoundSpace(runes []rune) bool {
+func (n *BadWordsCjkNormalizer) isCJK(r rune) bool {
+	return (r >= 0x4E00 && r <= 0x9FFF) ||
+		(r >= 0x3400 && r <= 0x4DBF) ||
+		(r >= 0x20000 && r <= 0x2A6DF)
+}
+
+func (n *BadWordsCjkNormalizer) hasCJKBoundSpace(runes []rune) bool {
 	for i := 0; i < len(runes); i++ {
 		if runes[i] == ' ' && n.isCJKBoundSpace(runes, i) {
 			return true
@@ -415,13 +442,10 @@ func (n *BadWordsNormalizer) hasCJKBoundSpace(runes []rune) bool {
 	return false
 }
 
-// isCJKBoundSpace returns true if runes[i] is a space bounded by CJK characters on both sides
-// isCJKBoundSpace 检查位置 i 的空格是否前后有 CJK 字符包围（跳过连续空格）
-func (n *BadWordsNormalizer) isCJKBoundSpace(runes []rune, i int) bool {
+func (n *BadWordsCjkNormalizer) isCJKBoundSpace(runes []rune, i int) bool {
 	if i <= 0 || i >= len(runes)-1 || runes[i] != ' ' {
 		return false
 	}
-	// 向前查找最近的非空格字符
 	hasCJKBefore := false
 	for j := i - 1; j >= 0; j-- {
 		if runes[j] != ' ' {
@@ -432,7 +456,6 @@ func (n *BadWordsNormalizer) isCJKBoundSpace(runes []rune, i int) bool {
 	if !hasCJKBefore {
 		return false
 	}
-	// 向后查找最近的非空格字符
 	for j := i + 1; j < len(runes); j++ {
 		if runes[j] != ' ' {
 			return n.isCJK(runes[j])
