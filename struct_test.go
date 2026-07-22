@@ -4,6 +4,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -214,4 +215,40 @@ func TestBasicTypeReflectSetValue(t *testing.T) {
 	err = BasicTypeReflectSetValue(reflect.ValueOf(&slice).Elem(), "test")
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "unsupported struct field type")
+}
+
+// TestDefaultValue_TimeDuration 测试DefaultValue对time.Duration字段的支持
+type durationConfig struct {
+	Timeout  time.Duration `default:"9s"`
+	Interval time.Duration `default:"1d5h7m3s"`
+	Retry    time.Duration `default:"1d"`
+	TTL      time.Duration `default:"2h"`
+}
+
+func TestDefaultValue_TimeDuration(t *testing.T) {
+	// 测试正常解析
+	cfg := &durationConfig{}
+	err := DefaultValue(cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, 9*time.Second, cfg.Timeout)
+	assert.Equal(t, 29*time.Hour+7*time.Minute+3*time.Second, cfg.Interval)
+	assert.Equal(t, 24*time.Hour, cfg.Retry)
+	assert.Equal(t, 2*time.Hour, cfg.TTL)
+
+	// 测试已有值不被覆盖
+	cfg2 := &durationConfig{
+		Timeout: 5 * time.Minute,
+	}
+	err = DefaultValue(cfg2)
+	assert.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, cfg2.Timeout)
+
+	// 测试无效tag值报错
+	type badDurationConfig struct {
+		Bad time.Duration `default:"abc"`
+	}
+	badCfg := &badDurationConfig{}
+	err = DefaultValue(badCfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "parse duration default value failed")
 }

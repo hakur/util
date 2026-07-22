@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
+
+	"fortio.org/duration"
 )
 
 // ParseStructWithEnv 解析结构体字段并从环境变量中读取值填充
@@ -148,6 +151,16 @@ func DefaultValue(data interface{}) (err error) {
 			// struct has no default tag ,thier fields has default tag
 			continue
 		} else if !fieldValue.IsZero() && fieldType.Type.Kind() != reflect.Ptr && fieldType.Type.Kind() != reflect.Struct {
+			continue
+		}
+
+		// 特殊处理time.Duration类型（底层为int64，但语义不同）
+		if fieldType.Type == reflect.TypeOf(time.Duration(0)) {
+			d, parseErr := duration.Parse(defaultValue)
+			if parseErr != nil {
+				return fmt.Errorf("field %s parse duration default value failed: %w", fieldType.Name, parseErr)
+			}
+			fieldValue.SetInt(int64(d))
 			continue
 		}
 
